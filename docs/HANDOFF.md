@@ -27,8 +27,8 @@ Build/TypeScript、Lint、26 项测试、`npm audit --omit=dev`、差异格式�
 
 ## 已知问题
 
-生产未配置 `GITHUB_TOKEN`，完整源码回填仍受 GitHub 匿名额度限制；代码按每轮 7 条控制匿名 API 预算。
+生产已配置仅限公开仓库只读的 Fine-grained `GITHUB_TOKEN`，GitHub API 额度为 5,000 次/小时；Token 于 2026-11-13 到期。
 
 ## 下一步
 
-保持每 30 分钟自动同步并观察匿名额度；如需加速剩余源码回填，再配置公开仓库只读的 `GITHUB_TOKEN`。
+保持每 30 分钟自动同步，并在 2026-11-13 前轮换 `GITHUB_TOKEN`。
