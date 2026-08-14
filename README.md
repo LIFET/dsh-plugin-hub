@@ -11,21 +11,21 @@
 </p>
 
 <p align="center">
-  <a href="https://dsh.lanshuagent.com/"><img alt="Live site" src="https://img.shields.io/website?url=https%3A%2F%2Fdsh.lanshuagent.com&amp;label=site&amp;up_message=online&amp;down_message=offline&amp;style=flat-square" /></a>
-  <a href="https://dsh.lanshuagent.com/api/registry/status"><img alt="Listed plugins" src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdsh.lanshuagent.com%2Fapi%2Fregistry%2Fstatus&amp;query=%24.summary.listed&amp;label=plugins&amp;color=0f766e&amp;cacheSeconds=300&amp;style=flat-square" /></a>
-  <a href="https://github.com/cclank/dsh-plugin-hub/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/cclank/dsh-plugin-hub/actions/workflows/ci.yml/badge.svg" /></a>
+  <a href="https://apiu.cc/"><img alt="Live site" src="https://img.shields.io/website?url=https%3A%2F%2Fapiu.cc&amp;label=site&amp;up_message=online&amp;down_message=offline&amp;style=flat-square" /></a>
+  <a href="https://apiu.cc/api/registry/status"><img alt="Listed plugins" src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapiu.cc%2Fapi%2Fregistry%2Fstatus&amp;query=%24.summary.listed&amp;label=plugins&amp;color=0f766e&amp;cacheSeconds=300&amp;style=flat-square" /></a>
+  <a href="https://github.com/LIFET/dsh-plugin-hub/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/LIFET/dsh-plugin-hub/actions/workflows/ci.yml/badge.svg" /></a>
   <a href="./LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-22c55e?style=flat-square" /></a>
   <img alt="Node.js" src="https://img.shields.io/badge/Node.js-%3E%3D22.13-339933?logo=nodedotjs&amp;logoColor=white&amp;style=flat-square" />
-  <img alt="Cloudflare Workers" src="https://img.shields.io/badge/Cloudflare-Workers-F38020?logo=cloudflare&amp;logoColor=white&amp;style=flat-square" />
+  <img alt="Next.js" src="https://img.shields.io/badge/Next.js-Node.js-000000?logo=nextdotjs&amp;logoColor=white&amp;style=flat-square" />
   <a href="https://github.com/deepseek-ai/deepseek-harness"><img alt="DeepSeek Harness community project" src="https://img.shields.io/badge/DeepSeek_Harness-community_project-4f46e5?style=flat-square" /></a>
 </p>
 
 <p align="center">
-  <a href="https://dsh.lanshuagent.com/">在线访问</a>
+  <a href="https://apiu.cc/">在线访问</a>
   ·
-  <a href="https://dsh.lanshuagent.com/api/plugins">JSON API</a>
+  <a href="https://apiu.cc/api/plugins">JSON API</a>
   ·
-  <a href="https://dsh.lanshuagent.com/plugins.json">静态快照</a>
+  <a href="https://apiu.cc/plugins.json">静态快照</a>
   ·
   <a href="https://github.com/topics/dsh-plugin">GitHub Topic</a>
 </p>
@@ -49,7 +49,7 @@ DeepSeek Harness 的插件生态增长很快，但仓库描述、安装命令和
 | 能力 | 说明 |
 | --- | --- |
 | 真实插件数据 | 合并社区精选列表、GitHub `topic:dsh-plugin` 元数据和仓库根目录 manifest。 |
-| 自动收录 | Cloudflare Cron 每 30 分钟发现新仓库，增量检查后写入 KV。 |
+| 自动收录 | systemd timer 每 30 分钟发现新仓库，增量检查后写入服务器本地数据文件。 |
 | 安装证据 | 只有在同一 Git commit 上完成 manifest 与入口源码检查后，才展示锁定 commit 的安装命令。 |
 | 轻量筛查 | 检查许可证、锁文件、生命周期脚本和有限源码信号，并公开展示发现项。 |
 | 插件浏览 | 支持搜索、分类、证据筛选、排序、卡片/列表视图和本地收藏。 |
@@ -63,7 +63,7 @@ awesome-dsh-plugin ─┐
                     ├─> 元数据归一化 ─> manifest / 源码信号检查 ─> 插件注册表
 GitHub dsh-plugin ──┘                                          │
                                                                ├─> Web UI
-Cloudflare Cron (30 min) ─> 增量复查 ─> Cloudflare KV ──────────┼─> JSON API
+systemd timer (30 min) ─> 增量复查 ─> 原子 JSON 存储 ───────────┼─> JSON API
                                                                └─> 状态接口
 ```
 
@@ -88,12 +88,12 @@ Cloudflare Cron (30 min) ─> 增量复查 ─> Cloudflare KV ──────
 
 | 接口 | 用途 |
 | --- | --- |
-| [`GET /api/plugins`](https://dsh.lanshuagent.com/api/plugins) | 当前动态注册表，优先读取 Cloudflare KV。 |
-| [`GET /api/registry/status`](https://dsh.lanshuagent.com/api/registry/status) | 最近同步时间、收录数量和筛查状态汇总。 |
-| [`GET /plugins.json`](https://dsh.lanshuagent.com/plugins.json) | 随构建发布的静态回退快照。 |
+| [`GET /api/plugins`](https://apiu.cc/api/plugins) | 当前动态注册表，优先读取服务器持久化数据。 |
+| [`GET /api/registry/status`](https://apiu.cc/api/registry/status) | 最近同步时间、收录数量和筛查状态汇总。 |
+| [`GET /plugins.json`](https://apiu.cc/plugins.json) | 随构建发布的静态回退快照。 |
 
 ```bash
-curl -sS https://dsh.lanshuagent.com/api/registry/status
+curl -sS https://apiu.cc/api/registry/status
 ```
 
 `/api/plugins` 允许跨域读取，并带有短时公共缓存头，适合做社区机器人、插件推荐器或二次目录的数据源。
@@ -106,7 +106,7 @@ curl -sS https://dsh.lanshuagent.com/api/registry/status
 - npm（使用仓库内的 `package-lock.json`）
 
 ```bash
-git clone https://github.com/cclank/dsh-plugin-hub.git
+git clone https://github.com/LIFET/dsh-plugin-hub.git
 cd dsh-plugin-hub
 npm ci
 npm run data:sync
@@ -125,42 +125,30 @@ Token 只需要读取公开仓库的权限，请勿提交到 Git。
 
 | 命令 | 作用 |
 | --- | --- |
-| `npm run dev` | 启动本地 vinext / Cloudflare Workers 开发环境。 |
+| `npm run dev` | 启动本地 Next.js 开发环境。 |
 | `npm run data:sync` | 只读同步精选列表、Topic 元数据和 manifest，更新本地快照。 |
-| `npm run build` | 生成 Cloudflare Workers 与前端静态资源。 |
+| `npm run build` | 生成 Next.js Standalone 服务与前端静态资源。 |
 | `npm run lint` | 执行 ESLint。 |
 | `npm test` | 生产构建后执行筛查规则、SSR、API 和数据一致性测试。 |
 
-## 部署到 Cloudflare
+## 自托管部署
 
-项目使用 vinext、Cloudflare Vite Plugin、Workers Cron 和 KV。部署参数集中在 [`vite.config.ts`](./vite.config.ts)：
-
-- Worker：`dsh-plugin-hub`
-- KV binding：`PLUGIN_REGISTRY`
-- Cron：`*/30 * * * *`
-- 默认自定义域名：`dsh.lanshuagent.com`
-
-Fork 后请先替换自定义域名，再执行：
+项目使用 Next.js Standalone、服务器本地原子 JSON 存储和 systemd timer，不依赖 Cloudflare。生产构建：
 
 ```bash
 npm ci
 npm run build
-npx wrangler deploy --config dist/server/wrangler.json
 ```
 
-生产环境可选配置 GitHub Token，以提高 API 限额：
+部署模板位于 `deploy/systemd/` 与 `deploy/nginx/`。运行环境参考 `.env.example`，其中 `CRON_SECRET` 必填；`GITHUB_TOKEN` 可选，只需公开仓库只读权限，用于提高 GitHub API 限额。
 
-```bash
-npx wrangler secret put GITHUB_TOKEN --config dist/server/wrangler.json
-```
-
-部署前可用 `npm test` 完成与 CI 相同的主要验证。
+服务只监听 `127.0.0.1:18200`，由 Nginx 提供 HTTPS。`/api/cron/sync` 在公网返回 404，只允许本机 systemd 任务携带 Bearer 密钥调用。部署前可用 `npm test` 完成主要验证。
 
 ## 项目结构
 
 ```text
 app/                       页面、交互和 Next 风格 API route
-worker/                    Cloudflare Worker 入口与增量插件注册表
+worker/plugin-registry.ts  服务端增量插件注册表与本地持久化
 lib/                       数据类型和插件静态筛查逻辑
 scripts/sync-plugins.mjs   本地只读数据同步
 data/                      精选回退与构建时注册表
@@ -176,7 +164,7 @@ prototype/                 最初的设计原型，保留作视觉对照
 - 修正插件元数据、分类或安装证据；
 - 补充可解释、低误报的筛查规则；
 - 改善移动端、无障碍、双语文案和数据可视化；
-- 为自动同步、API 和 Cloudflare 运行链路补测试。
+- 为自动同步、API 和自托管运行链路补测试。
 
 提交 Pull Request 前请运行：
 

@@ -1,3 +1,6 @@
+import { randomUUID, timingSafeEqual } from "node:crypto";
+import { mkdir, open, readFile, rename, stat, unlink } from "node:fs/promises";
+import { resolve } from "node:path";
 import bundledRegistryJson from "../data/plugins.generated.json";
 import type {
   CategoryId,
@@ -9,6 +12,7 @@ import type {
 import { readResponseTextLimited } from "../lib/limited-response.mjs";
 import {
   categoryFromText,
+  classifyInspectionFailure,
   markInspectionUnavailable,
   manifestSummary,
   normalizeRepositoryPath,
@@ -16,8 +20,9 @@ import {
   screenRepository,
 } from "../lib/plugin-screening.mjs";
 
-const REGISTRY_KEY = "registry:v2";
-const STATE_KEY = "sync-state:v1";
+const STORE_FILENAME = "plugin-registry-store.json";
+const LOCK_FILENAME = "plugin-registry-sync.lock";
+const LOCK_STALE_MS = 25 * 60 * 1_000;
 const MAX_SCANS_PER_RUN = 7;
 const MAX_SEARCH_PAGE = 10;
 const RESCAN_AFTER_MS = 7 * 24 * 60 * 60 * 1_000;
@@ -26,8 +31,23 @@ const MAX_COMMIT_JSON_BYTES = 300_000;
 const MAX_TEXT_BYTES = 140_000;
 
 export interface PluginRegistryEnv {
-  PLUGIN_REGISTRY?: KVNamespace;
   GITHUB_TOKEN?: string;
+  REGISTRY_DATA_DIR?: string;
+  REGISTRY_SCAN_LIMIT?: string | number;
+}
+
+interface RuntimeStore {
+  registry: PluginRegistryData;
+  state: SyncState;
+}
+
+export type RegistrySource = "node-file" | "bundled-fallback";
+
+export class RegistrySyncInProgressError extends Error {
+  constructor() {
+    super("Plugin registry sync is already running");
+    this.name = "RegistrySyncInProgressError";
+  }
 }
 
 interface GithubRepository {
@@ -50,6 +70,7 @@ interface GithubRepository {
   language: string | null;
   owner?: { login?: string };
   license?: { spdx_id?: string | null } | null;
+  topics?: string[];
 }
 
 interface GithubSearchResponse {
@@ -64,12 +85,116 @@ interface GithubCommitResponse {
 interface SeenCandidate {
   pushedAt: string | null;
   checkedAt: string;
-  outcome: "listed" | "rejected" | "blocked" | "error";
+  outcome: "listed" | "rejected" | "blocked" | "error" | "uninspectable";
+  retryAfter?: string;
 }
 
 interface SyncState {
   cursorPage: number;
   seen: Record<string, SeenCandidate>;
+}
+
+function dataDirectory(env: PluginRegistryEnv) {
+  const configured = env.REGISTRY_DATA_DIR?.trim() || process.env.REGISTRY_DATA_DIR?.trim();
+  return resolve(/* turbopackIgnore: true */ configured || ".data");
+}
+
+function storePath(env: PluginRegistryEnv) {
+  return resolve(/* turbopackIgnore: true */ dataDirectory(env), STORE_FILENAME);
+}
+
+let runtimeStoreCache: { path: string; mtimeMs: number; size: number; value: RuntimeStore } | null = null;
+
+async function readRuntimeStore(env: PluginRegistryEnv): Promise<RuntimeStore | null> {
+  try {
+    const path = storePath(env);
+    const details = await stat(path);
+    if (runtimeStoreCache?.path === path
+      && runtimeStoreCache.mtimeMs === details.mtimeMs
+      && runtimeStoreCache.size === details.size) {
+      return runtimeStoreCache.value;
+    }
+    const parsed = JSON.parse(await readFile(path, "utf8")) as Partial<RuntimeStore>;
+    if (!parsed.registry || !parsed.state || typeof parsed.state.seen !== "object") {
+      throw new Error("Registry store has an invalid shape");
+    }
+    runtimeStoreCache = { path, mtimeMs: details.mtimeMs, size: details.size, value: parsed as RuntimeStore };
+    return runtimeStoreCache.value;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+    console.error(JSON.stringify({
+      event: "registry.store.read.error",
+      error: error instanceof Error ? error.message : String(error),
+    }));
+    return null;
+  }
+}
+
+async function writeRuntimeStore(env: PluginRegistryEnv, value: RuntimeStore) {
+  const directory = dataDirectory(env);
+  await mkdir(directory, { recursive: true, mode: 0o700 });
+  const destination = storePath(env);
+  const temporary = resolve(/* turbopackIgnore: true */ directory, `.${STORE_FILENAME}.${process.pid}.${randomUUID()}.tmp`);
+  const handle = await open(temporary, "wx", 0o600);
+  try {
+    await handle.writeFile(JSON.stringify(value));
+    await handle.sync();
+  } finally {
+    await handle.close();
+  }
+  try {
+    await rename(temporary, destination);
+    runtimeStoreCache = null;
+  } catch (error) {
+    await unlink(temporary).catch(() => undefined);
+    throw error;
+  }
+}
+
+async function acquireSyncLock(env: PluginRegistryEnv) {
+  const directory = dataDirectory(env);
+  await mkdir(directory, { recursive: true, mode: 0o700 });
+  const lockPath = resolve(/* turbopackIgnore: true */ directory, LOCK_FILENAME);
+  const token = randomUUID();
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const handle = await open(lockPath, "wx", 0o600);
+      try {
+        await handle.writeFile(JSON.stringify({ token, pid: process.pid, acquiredAt: new Date().toISOString() }));
+      } catch (error) {
+        await handle.close().catch(() => undefined);
+        await unlink(lockPath).catch(() => undefined);
+        throw error;
+      }
+      await handle.close();
+      return async () => {
+        try {
+          const current = JSON.parse(await readFile(lockPath, "utf8")) as { token?: string };
+          const expected = Buffer.from(token);
+          const actual = Buffer.from(current.token || "");
+          if (expected.length === actual.length && timingSafeEqual(expected, actual)) {
+            await unlink(lockPath);
+          }
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+        }
+      };
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+      const details = await stat(lockPath).catch(() => null);
+      if (!details || Date.now() - details.mtimeMs <= LOCK_STALE_MS) {
+        throw new RegistrySyncInProgressError();
+      }
+      const stalePath = `${lockPath}.stale.${randomUUID()}`;
+      await rename(lockPath, stalePath).catch((renameError) => {
+        if ((renameError as NodeJS.ErrnoException).code !== "ENOENT") throw renameError;
+      });
+      await unlink(stalePath).catch(() => undefined);
+    }
+  }
+
+  throw new RegistrySyncInProgressError();
 }
 
 function bundledRegistry(): PluginRegistryData {
@@ -81,7 +206,7 @@ function bundledRegistry(): PluginRegistryData {
 function githubHeaders(env: PluginRegistryEnv) {
   return {
     Accept: "application/vnd.github+json",
-    "User-Agent": "dsh-plugin-hub-cloudflare-sync",
+    "User-Agent": "dsh-plugin-hub-self-hosted-sync",
     "X-GitHub-Api-Version": "2022-11-28",
     ...(env.GITHUB_TOKEN?.trim() ? { Authorization: `Bearer ${env.GITHUB_TOKEN.trim()}` } : {}),
   };
@@ -92,6 +217,21 @@ function validateRepoName(value: string) {
     throw new Error(`Invalid GitHub repository name: ${value}`);
   }
   return value;
+}
+
+function repositoryFromUrl(value: string) {
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error("请输入完整的 GitHub 仓库地址");
+  }
+  if (parsed.protocol !== "https:" || parsed.hostname.toLowerCase() !== "github.com") {
+    throw new Error("只支持 https://github.com 上的公开仓库");
+  }
+  const parts = parsed.pathname.replace(/\.git$/u, "").split("/").filter(Boolean);
+  if (parts.length !== 2) throw new Error("仓库地址应为 https://github.com/owner/repository");
+  return validateRepoName(`${parts[0]}/${parts[1]}`);
 }
 
 async function fetchLimited(url: string, init: RequestInit, maxBytes: number) {
@@ -129,6 +269,28 @@ async function fetchRaw(repo: string, revision: string, filePath: string) {
   const encodedPath = safePath.split("/").map(encodeURIComponent).join("/");
   const url = `https://raw.githubusercontent.com/${repo}/${encodeURIComponent(revision)}/${encodedPath}`;
   return fetchLimited(url, { headers: { Accept: "text/plain" } }, MAX_TEXT_BYTES);
+}
+
+export async function preflightPluginRepository(value: string, env: PluginRegistryEnv) {
+  const repo = repositoryFromUrl(value.trim());
+  const meta = await fetchJson<GithubRepository>(`https://api.github.com/repos/${repo}`, env, MAX_COMMIT_JSON_BYTES);
+  const packageText = await fetchRaw(repo, meta.default_branch, "package.json");
+  let manifest: PluginManifest = manifestSummary(null, meta.default_branch);
+  if (packageText !== null) {
+    try {
+      manifest = manifestSummary(JSON.parse(packageText), meta.default_branch);
+    } catch {
+      manifest = { ...manifest, state: "invalid" };
+    }
+  }
+  const topic = Array.isArray(meta.topics) && meta.topics.includes("dsh-plugin");
+  return {
+    repo,
+    url: `https://github.com/${repo}`,
+    topic,
+    manifest: manifest.state,
+    eligible: topic && manifest.state === "verified",
+  };
 }
 
 async function resolveCommitSha(repo: string, branch: string, env: PluginRegistryEnv) {
@@ -251,8 +413,8 @@ function recordFromInspection(
 ) {
   const curated = previous?.curated === true;
   const [fallbackOwner, fallbackName] = meta.full_name.split("/");
-  const description = meta.description?.trim() || manifest.packageName || meta.name;
-  const installAllowed = curated ? screening.state !== "blocked" : screening.state === "clear";
+  const description = normalizeDescription(meta.description || manifest.packageName || meta.name);
+  const installAllowed = screening.state === "clear";
   const firstSeenAt = previous?.discovery?.firstSeenAt || previous?.added || now.slice(0, 10);
   const category = previous?.category || categoryFromText(`${meta.name} ${description}`) as CategoryId;
   return {
@@ -263,7 +425,7 @@ function recordFromInspection(
     repo: meta.full_name,
     url: `https://github.com/${meta.full_name}`,
     category,
-    description: previous?.description || { zh: description, en: description },
+    description: previous?.description || description,
     added: previous?.added || now.slice(0, 10),
     curated,
     topic: true,
@@ -305,17 +467,49 @@ async function searchTopicPage(page: number, env: PluginRegistryEnv) {
 }
 
 function shouldRescan(plugin: PluginRecord, state: SyncState) {
+  const retryAfter = Date.parse(state.seen[plugin.id]?.retryAfter || "0");
+  if (Number.isFinite(retryAfter) && retryAfter > Date.now()) return false;
   if (plugin.screening?.scope !== "source") return true;
   const seen = state.seen[plugin.id];
   const checked = Date.parse(seen?.checkedAt || plugin.screening.checkedAt || "0");
   return !Number.isFinite(checked) || Date.now() - checked >= RESCAN_AFTER_MS;
 }
 
-function candidateWasRecentlyRejected(meta: GithubRepository, state: SyncState) {
+function candidateIsDeferred(meta: GithubRepository, state: SyncState) {
   const seen = state.seen[meta.full_name.toLowerCase()];
-  if (!seen || !["rejected", "blocked"].includes(seen.outcome)) return false;
+  if (!seen) return false;
+  const retryAfter = Date.parse(seen.retryAfter || "0");
+  if (Number.isFinite(retryAfter) && retryAfter > Date.now()) return true;
+  if (!["rejected", "blocked"].includes(seen.outcome)) return false;
   const checked = Date.parse(seen.checkedAt);
   return seen.pushedAt === meta.pushed_at && Number.isFinite(checked) && Date.now() - checked < RESCAN_AFTER_MS;
+}
+
+function retryAfter(now: string, milliseconds: number) {
+  return new Date(Date.parse(now) + milliseconds).toISOString();
+}
+
+function inspectionFailurePolicy(message: string, now: string) {
+  return classifyInspectionFailure(message) === "uninspectable"
+    ? { outcome: "uninspectable" as const, retryAfter: retryAfter(now, RESCAN_AFTER_MS), degraded: false }
+    : { outcome: "error" as const, retryAfter: retryAfter(now, 6 * 60 * 60 * 1_000), degraded: true };
+}
+
+function normalizeDescription(value: string) {
+  const clean = Array.from(value, (character) => {
+    const code = character.charCodeAt(0);
+    return code < 32 || code === 127 ? " " : character;
+  }).join("").replace(/\s+/gu, " ").trim().slice(0, 240);
+  const fallback = clean || "No repository description provided.";
+  return /[\u3400-\u9fff]/u.test(fallback)
+    ? { zh: fallback, en: `[GitHub description] ${fallback}`.slice(0, 280) }
+    : { zh: `[GitHub 原文] ${fallback}`.slice(0, 280), en: fallback };
+}
+
+function scanLimit(env: PluginRegistryEnv) {
+  const defaultLimit = env.GITHUB_TOKEN?.trim() ? MAX_SCANS_PER_RUN : 2;
+  const parsed = Number(env.REGISTRY_SCAN_LIMIT || defaultLimit);
+  return Number.isInteger(parsed) ? Math.min(50, Math.max(1, parsed)) : MAX_SCANS_PER_RUN;
 }
 
 async function mapLimit<T, R>(items: T[], limit: number, mapper: (item: T) => Promise<R>) {
@@ -357,26 +551,30 @@ function summarize(registry: PluginRegistryData) {
   registry.sources.topic.matched = registry.summary.metadataMatches;
 }
 
-export async function readPluginRegistry(env: PluginRegistryEnv): Promise<PluginRegistryData> {
-  if (!env.PLUGIN_REGISTRY) return bundledRegistry();
-  try {
-    const stored = await env.PLUGIN_REGISTRY.get<PluginRegistryData>(REGISTRY_KEY, "json");
-    return stored ? sanitizeRegistryInstallEvidence(stored) as PluginRegistryData : bundledRegistry();
-  } catch (error) {
-    console.error(JSON.stringify({ event: "registry.read.error", error: error instanceof Error ? error.message : String(error) }));
-    return bundledRegistry();
-  }
+export async function readPluginRegistryWithSource(env: PluginRegistryEnv): Promise<{
+  registry: PluginRegistryData;
+  source: RegistrySource;
+}> {
+  const stored = await readRuntimeStore(env);
+  if (!stored) return { registry: bundledRegistry(), source: "bundled-fallback" };
+  return {
+    registry: sanitizeRegistryInstallEvidence(stored.registry) as PluginRegistryData,
+    source: "node-file",
+  };
 }
 
-export async function syncPluginRegistry(env: PluginRegistryEnv) {
-  if (!env.PLUGIN_REGISTRY) {
-    console.warn(JSON.stringify({ event: "registry.sync.skipped", reason: "PLUGIN_REGISTRY binding missing" }));
-    return null;
-  }
+export async function readPluginRegistry(env: PluginRegistryEnv): Promise<PluginRegistryData> {
+  return (await readPluginRegistryWithSource(env)).registry;
+}
+
+async function syncPluginRegistryUnlocked(env: PluginRegistryEnv) {
 
   const now = new Date().toISOString();
-  const registry = await readPluginRegistry(env);
-  const state: SyncState = await env.PLUGIN_REGISTRY.get<SyncState>(STATE_KEY, "json") || { cursorPage: 2, seen: {} };
+  const stored = await readRuntimeStore(env);
+  const registry = stored
+    ? sanitizeRegistryInstallEvidence(stored.registry) as PluginRegistryData
+    : bundledRegistry();
+  const state: SyncState = stored?.state || { cursorPage: 2, seen: {} };
   const errors: string[] = [];
   let pageOne: GithubSearchResponse;
   try {
@@ -384,7 +582,7 @@ export async function syncPluginRegistry(env: PluginRegistryEnv) {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     registry.automation = { ...registry.automation, state: "degraded", lastRunAt: now, error: message };
-    await env.PLUGIN_REGISTRY.put(REGISTRY_KEY, JSON.stringify(registry));
+    await writeRuntimeStore(env, { registry, state });
     console.error(JSON.stringify({ event: "registry.sync.error", stage: "discovery", error: message }));
     return registry;
   }
@@ -413,14 +611,14 @@ export async function syncPluginRegistry(env: PluginRegistryEnv) {
   const newOrChanged = [...discovered.entries()]
     .filter(([id, meta]) => {
       const previous = previousById.get(id);
-      if (candidateWasRecentlyRejected(meta, state)) return false;
+      if (candidateIsDeferred(meta, state)) return false;
       return !previous || previous.pushedAt !== meta.pushed_at || shouldRescan(previous, state);
     })
     .map(([, meta]) => meta);
   const staleExisting = registry.plugins
     .filter((plugin) => shouldRescan(plugin, state) && !discovered.has(plugin.id))
     .map(metadataFromPlugin);
-  const candidates = [...newOrChanged, ...staleExisting].slice(0, MAX_SCANS_PER_RUN);
+  const candidates = [...newOrChanged, ...staleExisting].slice(0, scanLimit(env));
   const discoveredThisRun = [...discovered.keys()].filter((id) => !previousById.has(id)).length;
 
   const results = await mapLimit(candidates, 2, async (meta) => {
@@ -436,10 +634,20 @@ export async function syncPluginRegistry(env: PluginRegistryEnv) {
     const id = result.meta.full_name.toLowerCase();
     const previous = previousById.get(id);
     if ("error" in result) {
-      state.seen[id] = { pushedAt: result.meta.pushed_at, checkedAt: now, outcome: "error" };
-      errors.push(`${result.meta.full_name}: ${result.error}`);
+      const errorMessage = result.error || "Unknown inspection error";
+      const policy = inspectionFailurePolicy(errorMessage, now);
+      state.seen[id] = {
+        pushedAt: result.meta.pushed_at,
+        checkedAt: now,
+        outcome: policy.outcome,
+        retryAfter: policy.retryAfter,
+      };
+      if (policy.degraded) errors.push(`${result.meta.full_name}: ${errorMessage}`);
       if (previous) {
-        previousById.set(id, markInspectionUnavailable(previous, { kind: "error", checkedAt: now }) as PluginRecord);
+        previousById.set(id, markInspectionUnavailable(previous as unknown as Record<string, unknown>, {
+          kind: "error",
+          checkedAt: now,
+        }) as unknown as PluginRecord);
       }
       continue;
     }
@@ -460,11 +668,11 @@ export async function syncPluginRegistry(env: PluginRegistryEnv) {
       continue;
     }
     if (previous) {
-      previousById.set(id, markInspectionUnavailable(previous, {
+      previousById.set(id, markInspectionUnavailable(previous as unknown as Record<string, unknown>, {
         kind: "rejected",
         checkedAt: now,
         manifest: "manifest" in inspection ? inspection.manifest : null,
-      }) as PluginRecord);
+      }) as unknown as PluginRecord);
     }
   }
 
@@ -499,8 +707,7 @@ export async function syncPluginRegistry(env: PluginRegistryEnv) {
   };
   summarize(registry);
 
-  await env.PLUGIN_REGISTRY.put(REGISTRY_KEY, JSON.stringify(registry));
-  await env.PLUGIN_REGISTRY.put(STATE_KEY, JSON.stringify(compactState(state)));
+  await writeRuntimeStore(env, { registry, state: compactState(state) });
   console.log(JSON.stringify({
     event: "registry.sync.complete",
     checked: candidates.length,
@@ -512,12 +719,21 @@ export async function syncPluginRegistry(env: PluginRegistryEnv) {
   return registry;
 }
 
-export function pluginRegistryResponse(registry: PluginRegistryData) {
+export async function syncPluginRegistry(env: PluginRegistryEnv) {
+  const release = await acquireSyncLock(env);
+  try {
+    return await syncPluginRegistryUnlocked(env);
+  } finally {
+    await release();
+  }
+}
+
+export function pluginRegistryResponse(registry: PluginRegistryData, source: RegistrySource) {
   return Response.json(registry, {
     headers: {
       "Access-Control-Allow-Origin": "*",
       "Cache-Control": "public, max-age=60, s-maxage=300, stale-while-revalidate=3600",
-      "X-Registry-Source": registry.automation?.state === "live" ? "cloudflare-kv" : "bundled-fallback",
+      "X-Registry-Source": source,
       "X-Content-Type-Options": "nosniff",
     },
   });

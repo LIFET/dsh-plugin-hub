@@ -1,4 +1,5 @@
 export const SCREENING_VERSION: number;
+export function classifyInspectionFailure(value: unknown): "uninspectable" | "transient";
 
 export interface ScreeningManifest {
   state: "verified" | "package-only" | "missing" | "invalid" | "error";

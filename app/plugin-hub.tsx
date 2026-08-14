@@ -6,7 +6,8 @@ import type {
   PluginRecord,
   PluginRegistryData,
 } from "@/lib/plugin-data";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type PageId = "home" | "catalog" | "rank" | "submit" | "guide";
 type SortId = "curated" | "stars" | "updated" | "added" | "name";
@@ -41,6 +42,14 @@ const CATEGORY_HINTS: Record<CategoryId, Record<Language, string>> = {
 };
 
 const PREFS_KEY = "dsh-plugin-hub-prefs-v2";
+const RESULT_BATCH_SIZE = 36;
+const PAGE_PATHS: Record<PageId, string> = {
+  home: "/",
+  catalog: "/plugins",
+  rank: "/rank",
+  submit: "/submit",
+  guide: "/guide",
+};
 
 function text(lang: Language, zh: string, en: string) {
   return lang === "zh" ? zh : en;
@@ -70,10 +79,15 @@ function relativeDate(value: string | null, lang: Language) {
   return text(lang, `${Math.floor(days / 365)} 年前`, `${Math.floor(days / 365)}y ago`);
 }
 
-function pageFromHash(): PageId {
+function pageFromLocation(): PageId {
   if (typeof window === "undefined") return "home";
-  const value = window.location.hash.replace(/^#\/?/u, "").split(/[/?]/u)[0];
-  return PAGES.some((page) => page.id === value) ? (value as PageId) : "home";
+  const first = window.location.pathname.split("/").filter(Boolean)[0];
+  if (first === "plugins" || first === "plugin") return "catalog";
+  return PAGES.some((page) => page.id === first) ? (first as PageId) : "home";
+}
+
+function pluginPath(plugin: PluginRecord) {
+  return `/plugin/${plugin.id.split("/").map(encodeURIComponent).join("/")}`;
 }
 
 function maintenanceLabel(plugin: PluginRecord, lang: Language) {
@@ -153,10 +167,20 @@ function PluginCard({
   );
 }
 
-export function PluginHub({ data: initialData }: { data: PluginRegistryData }) {
-  const [data, setData] = useState(initialData);
-  const [registrySource, setRegistrySource] = useState<"bundled" | "live">("bundled");
-  const [page, setPage] = useState<PageId>("home");
+export function PluginHub({
+  data: initialData,
+  initialPage = "home",
+  initialPluginId = null,
+  initialSource = "bundled",
+}: {
+  data: PluginRegistryData;
+  initialPage?: PageId;
+  initialPluginId?: string | null;
+  initialSource?: "bundled" | "live";
+}) {
+  const data = initialData;
+  const [registrySource] = useState<"bundled" | "live">(initialSource);
+  const [page, setPage] = useState<PageId>(initialPage);
   const [lang, setLang] = useState<Language>("zh");
   const [theme, setTheme] = useState<"dark" | "light">("light");
   const [preferencesReady, setPreferencesReady] = useState(false);
@@ -166,14 +190,48 @@ export function PluginHub({ data: initialData }: { data: PluginRegistryData }) {
   const [view, setView] = useState<"list" | "cards">("list");
   const [evidence, setEvidence] = useState<EvidenceFilter>("all");
   const [favorites, setFavorites] = useState<string[]>([]);
-  const [selected, setSelected] = useState<PluginRecord | null>(null);
+  const [selected, setSelected] = useState<PluginRecord | null>(() => (
+    initialPluginId ? initialData.plugins.find((plugin) => plugin.id === initialPluginId) || null : null
+  ));
   const [copied, setCopied] = useState<string | null>(null);
+  const [copyMessage, setCopyMessage] = useState("");
+  const [repositoryUrl, setRepositoryUrl] = useState("");
+  const [preflight, setPreflight] = useState<null | {
+    loading?: boolean;
+    error?: string;
+    repo?: string;
+    topic?: boolean;
+    manifest?: string;
+    eligible?: boolean;
+  }>(null);
+  const [visibleWindow, setVisibleWindow] = useState({ key: "", count: RESULT_BATCH_SIZE });
+  const drawerRef = useRef<HTMLElement | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
-    const onHash = () => setPage(pageFromHash());
-    window.addEventListener("hashchange", onHash);
+    const onPopState = () => {
+      setPage(pageFromLocation());
+      const match = window.location.pathname.match(/^\/plugin\/([^/]+)\/([^/]+)\/?$/u);
+      const id = match ? `${decodeURIComponent(match[1])}/${decodeURIComponent(match[2])}`.toLowerCase() : null;
+      setSelected(id ? data.plugins.find((plugin) => plugin.id === id) || null : null);
+    };
+    window.addEventListener("popstate", onPopState);
     const restoreTimer = window.setTimeout(() => {
-      setPage(pageFromHash());
+      if (window.location.hash.startsWith("#/")) {
+        const legacy = window.location.hash.replace(/^#\/?/u, "").split(/[/?]/u)[0] as PageId;
+        const next = PAGE_PATHS[legacy] || "/";
+        window.history.replaceState(null, "", next);
+        setPage(pageFromLocation());
+      }
+      const params = new URLSearchParams(window.location.search);
+      const initialCategory = params.get("category");
+      const initialSort = params.get("sort");
+      const initialEvidence = params.get("evidence");
+      setQuery(params.get("q") || "");
+      if (initialCategory === "all" || CATEGORY_ORDER.includes(initialCategory as CategoryId)) setCategory(initialCategory as "all" | CategoryId);
+      if (["curated", "stars", "updated", "added", "name"].includes(initialSort || "")) setSort(initialSort as SortId);
+      if (["all", "auto", "topic", "manifest", "clear", "review", "favorites"].includes(initialEvidence || "")) setEvidence(initialEvidence as EvidenceFilter);
       try {
         const saved = JSON.parse(localStorage.getItem(PREFS_KEY) || "{}");
         if (saved.lang === "zh" || saved.lang === "en") setLang(saved.lang);
@@ -188,39 +246,14 @@ export function PluginHub({ data: initialData }: { data: PluginRegistryData }) {
     }, 0);
     return () => {
       window.clearTimeout(restoreTimer);
-      window.removeEventListener("hashchange", onHash);
+      window.removeEventListener("popstate", onPopState);
     };
-  }, []);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    const timer = window.setTimeout(() => controller.abort(), 8_000);
-    fetch("/api/plugins", {
-      headers: { Accept: "application/json" },
-      signal: controller.signal,
-    })
-      .then(async (response) => {
-        if (!response.ok) throw new Error(`Registry request failed: ${response.status}`);
-        const next = await response.json() as PluginRegistryData;
-        if (!Array.isArray(next.plugins) || !next.summary || !next.automation) {
-          throw new Error("Registry response has an invalid shape");
-        }
-        setData(next);
-        setRegistrySource(response.headers.get("x-registry-source") === "cloudflare-kv" ? "live" : "bundled");
-      })
-      .catch(() => {
-        // The server-rendered registry remains usable during network or KV outages.
-      })
-      .finally(() => window.clearTimeout(timer));
-    return () => {
-      window.clearTimeout(timer);
-      controller.abort();
-    };
-  }, []);
+  }, [data.plugins]);
 
   useEffect(() => {
     document.documentElement.style.colorScheme = theme;
     document.documentElement.dataset.theme = theme;
+    document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
     if (!preferencesReady) return;
     try {
       localStorage.setItem(PREFS_KEY, JSON.stringify({ lang, theme, view, favorites }));
@@ -230,25 +263,66 @@ export function PluginHub({ data: initialData }: { data: PluginRegistryData }) {
   }, [favorites, lang, preferencesReady, theme, view]);
 
   useEffect(() => {
-    if (!selected) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setSelected(null);
-    };
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    window.addEventListener("keydown", onKey);
-    return () => {
-      document.body.style.overflow = previous;
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [selected]);
+    const pageTitle = selected?.name || PAGES.find((item) => item.id === page)?.[lang] || "DSH";
+    document.title = page === "home" && !selected
+      ? text(lang, "DSH 插件资源站", "DSH Plugin Hub")
+      : `${pageTitle} · ${text(lang, "DSH 插件资源站", "DSH Plugin Hub")}`;
+  }, [lang, page, selected]);
 
   const go = useCallback((next: PageId) => {
     setPage(next);
     setSelected(null);
-    window.history.pushState(null, "", `#/${next}`);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.history.pushState(null, "", PAGE_PATHS[next]);
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    window.scrollTo({ top: 0, behavior: reduced ? "auto" : "smooth" });
   }, []);
+
+  const openPlugin = useCallback((plugin: PluginRecord) => {
+    returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    window.history.pushState({ drawer: true }, "", pluginPath(plugin));
+    setSelected(plugin);
+  }, []);
+
+  const closeSelected = useCallback(() => {
+    if (window.history.state?.drawer) window.history.back();
+    else {
+      window.history.replaceState(null, "", PAGE_PATHS.catalog);
+      setPage("catalog");
+      setSelected(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!selected) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeSelected();
+      if (event.key !== "Tab") return;
+      const focusable = drawerRef.current?.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      if (!focusable?.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    returnFocusRef.current ||= document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKey);
+    closeButtonRef.current?.focus();
+    return () => {
+      document.body.style.overflow = previous;
+      window.removeEventListener("keydown", onKey);
+      returnFocusRef.current?.focus();
+      returnFocusRef.current = null;
+    };
+  }, [closeSelected, selected]);
 
   const toggleFavorite = useCallback((id: string) => {
     setFavorites((current) =>
@@ -260,11 +334,32 @@ export function PluginHub({ data: initialData }: { data: PluginRegistryData }) {
     try {
       await navigator.clipboard.writeText(value);
       setCopied(id);
+      setCopyMessage(text(lang, "已复制到剪贴板", "Copied to clipboard"));
       window.setTimeout(() => setCopied((current) => (current === id ? null : current)), 1500);
+      window.setTimeout(() => setCopyMessage(""), 2200);
     } catch {
       setCopied(null);
+      setCopyMessage(text(lang, "复制失败，请手动复制", "Copy failed; copy manually"));
+      window.setTimeout(() => setCopyMessage(""), 3200);
     }
-  }, []);
+  }, [lang]);
+
+  const checkRepository = useCallback(async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setPreflight({ loading: true });
+    try {
+      const response = await fetch("/api/repository/check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: repositoryUrl }),
+      });
+      const result = await response.json() as { error?: string; repo?: string; topic?: boolean; manifest?: string; eligible?: boolean };
+      if (!response.ok) throw new Error(result.error || text(lang, "检查失败", "Check failed"));
+      setPreflight(result);
+    } catch (error) {
+      setPreflight({ error: error instanceof Error ? error.message : text(lang, "检查失败", "Check failed") });
+    }
+  }, [lang, repositoryUrl]);
 
   const categoryCounts = useMemo(() => {
     const counts = Object.fromEntries(CATEGORY_ORDER.map((id) => [id, 0])) as Record<CategoryId, number>;
@@ -307,6 +402,22 @@ export function PluginHub({ data: initialData }: { data: PluginRegistryData }) {
     });
   }, [category, data.categories, data.plugins, evidence, favorites, query, sort]);
 
+  useEffect(() => {
+    if (!preferencesReady || page !== "catalog" || selected) return;
+    const params = new URLSearchParams();
+    if (query.trim()) params.set("q", query.trim());
+    if (category !== "all") params.set("category", category);
+    if (sort !== "curated") params.set("sort", sort);
+    if (evidence !== "all") params.set("evidence", evidence);
+    const search = params.toString();
+    window.history.replaceState(null, "", `${PAGE_PATHS.catalog}${search ? `?${search}` : ""}`);
+  }, [category, evidence, page, preferencesReady, query, selected, sort]);
+
+  const filterKey = `${query}\u0000${category}\u0000${sort}\u0000${evidence}`;
+  const visibleCount = visibleWindow.key === filterKey ? visibleWindow.count : RESULT_BATCH_SIZE;
+  const visiblePlugins = filtered.slice(0, visibleCount);
+  const inspectedCount = data.plugins.filter((plugin) => plugin.screening.scope === "source").length;
+
   const topStars = useMemo(
     () => [...data.plugins].filter((plugin) => plugin.stars !== null).sort((a, b) => (b.stars || 0) - (a.stars || 0)).slice(0, 20),
     [data.plugins],
@@ -318,21 +429,23 @@ export function PluginHub({ data: initialData }: { data: PluginRegistryData }) {
   const featured = topStars.slice(0, 6);
   const generatedLabel = data.generatedAt.slice(0, 16).replace("T", " ") + " UTC";
   const automationLabel = data.automation.state === "live"
-    ? text(lang, "云端巡检正常", "Cloud scan healthy")
+    ? text(lang, "自动巡检正常", "Automated scan healthy")
     : data.automation.state === "degraded"
       ? text(lang, "巡检部分降级", "Scan partially degraded")
-      : text(lang, "等待首次云端巡检", "Awaiting first cloud scan");
+      : text(lang, "等待首次自动巡检", "Awaiting first automated scan");
   const channelLabel = registrySource === "live"
-    ? text(lang, "KV 实时目录", "Live KV registry")
+    ? text(lang, "实时目录", "Live registry")
     : text(lang, "内置数据兜底", "Bundled fallback");
 
   return (
     <div className="hub" data-theme={theme} data-lang={lang}>
+      <div className="site-frame" inert={selected ? true : undefined}>
       <header className="site-header">
         <div className="site-header__inner">
-          <button className="brand" type="button" onClick={() => go("home")} aria-label={text(lang, "返回首页", "Back home")}>
+          <button className="brand" type="button" onClick={() => go("home")}>
             <span className="brand__mark">dsh</span>
-            <span>{text(lang, "插件资源站", "Plugin Hub")}</span>
+            <span className="brand__name">{text(lang, "插件资源站", "Plugin Hub")}</span>
+            <span className="sr-only">{text(lang, "，返回首页", ", back home")}</span>
           </button>
           <nav className="main-nav" aria-label={text(lang, "主导航", "Main navigation")}>
             {PAGES.map((item) => (
@@ -341,6 +454,7 @@ export function PluginHub({ data: initialData }: { data: PluginRegistryData }) {
                 type="button"
                 key={item.id}
                 onClick={() => go(item.id)}
+                aria-current={page === item.id ? "page" : undefined}
               >
                 {item[lang]}
               </button>
@@ -355,6 +469,7 @@ export function PluginHub({ data: initialData }: { data: PluginRegistryData }) {
                 go("catalog");
               }}
               title={text(lang, "查看收藏", "View favorites")}
+              aria-label={text(lang, `查看收藏，${favorites.length} 项`, `View ${favorites.length} saved plugins`)}
             >
               ★ <span>{favorites.length}</span>
             </button>
@@ -375,8 +490,8 @@ export function PluginHub({ data: initialData }: { data: PluginRegistryData }) {
               <div className="hero__grid" aria-hidden="true" />
               <div className="hero__glow" aria-hidden="true" />
               <div className="shell hero__content">
-                <div className="eyebrow"><span className="live-dot" /> DeepSeek Harness <i>/</i> {automationLabel} <i>/</i> {channelLabel} <i>/</i> 30 MIN</div>
-                <h1>{text(lang, "一切皆插件。\n先看证据，再决定装不装。", "Everything is a plugin.\nCheck the evidence before you install.")}</h1>
+                <div className="eyebrow"><span className="live-dot" /> DeepSeek Harness <i>/</i> {channelLabel} <i>/</i> 30 MIN</div>
+                <h1><span>{text(lang, "一切皆插件。", "Everything is a plugin.")}</span><span>{text(lang, "先看证据，再决定装不装。", "Check the evidence before you install.")}</span></h1>
                 <p>
                   {text(
                     lang,
@@ -388,6 +503,12 @@ export function PluginHub({ data: initialData }: { data: PluginRegistryData }) {
                   <button className="primary-button" type="button" onClick={() => go("catalog")}>{text(lang, "浏览插件目录", "Browse catalog")} <span>→</span></button>
                   <a className="secondary-button" href={data.sources.curated.repository} target="_blank" rel="noreferrer">{text(lang, "查看数据源", "Open data source")} ↗</a>
                 </div>
+                <details className="scan-status">
+                  <summary><span className={`status-dot status-dot--${data.automation.state}`} />{automationLabel}</summary>
+                  <div><b>{inspectedCount}/{data.summary.listed}</b><span>{text(lang, "已完成源码级检查", "source-level checks complete")}</span></div>
+                  <p>{data.automation.error || text(lang, "当前没有巡检错误。", "No current scan error.")}</p>
+                  <small>{text(lang, `上次运行：${data.automation.lastRunAt?.slice(0, 16).replace("T", " ") || "尚未运行"} UTC`, `Last run: ${data.automation.lastRunAt?.slice(0, 16).replace("T", " ") || "not yet"} UTC`)}</small>
+                </details>
               </div>
             </section>
 
@@ -408,7 +529,7 @@ export function PluginHub({ data: initialData }: { data: PluginRegistryData }) {
               </div>
               <div className="featured-grid">
                 {featured.map((plugin, index) => (
-                  <button className="featured-card" type="button" key={plugin.id} onClick={() => setSelected(plugin)}>
+                  <button className="featured-card" type="button" key={plugin.id} onClick={() => openPlugin(plugin)}>
                     <span className="featured-card__rank">0{index + 1}</span>
                     <span className="featured-card__head"><strong>{plugin.name}</strong><em>★ {formatNumber(plugin.stars, lang)}</em></span>
                     <span className="featured-card__owner">{plugin.owner}</span>
@@ -464,7 +585,7 @@ export function PluginHub({ data: initialData }: { data: PluginRegistryData }) {
             <div className="catalog-toolbar">
               <label className="search-field">
                 <span>/</span>
-                <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={text(lang, "搜索名称、作者、能力或包名", "Search name, author, capability, package")} />
+                <input value={query} onChange={(event) => setQuery(event.target.value)} aria-label={text(lang, "搜索插件", "Search plugins")} placeholder={text(lang, "搜索名称、作者、能力或包名", "Search name, author, capability, package")} />
                 {query && <button type="button" onClick={() => setQuery("")} aria-label={text(lang, "清空搜索", "Clear search")}>×</button>}
               </label>
               <select value={evidence} onChange={(event) => setEvidence(event.target.value as EvidenceFilter)} aria-label={text(lang, "证据筛选", "Evidence filter")}>
@@ -483,9 +604,9 @@ export function PluginHub({ data: initialData }: { data: PluginRegistryData }) {
                 <option value="added">{text(lang, "最近收录", "Recently added")}</option>
                 <option value="name">{text(lang, "名称 A→Z", "Name A→Z")}</option>
               </select>
-              <div className="view-switch" aria-label={text(lang, "视图", "View") }>
-                <button className={view === "list" ? "is-active" : ""} type="button" onClick={() => setView("list")} title={text(lang, "列表", "List")}>☰</button>
-                <button className={view === "cards" ? "is-active" : ""} type="button" onClick={() => setView("cards")} title={text(lang, "卡片", "Cards")}>▦</button>
+              <div className="view-switch" role="group" aria-label={text(lang, "视图", "View") }>
+                <button className={view === "list" ? "is-active" : ""} type="button" onClick={() => setView("list")} aria-label={text(lang, "列表视图", "List view")} aria-pressed={view === "list"}>☰</button>
+                <button className={view === "cards" ? "is-active" : ""} type="button" onClick={() => setView("cards")} aria-label={text(lang, "卡片视图", "Card view")} aria-pressed={view === "cards"}>▦</button>
               </div>
             </div>
             <div className="category-chips">
@@ -496,13 +617,13 @@ export function PluginHub({ data: initialData }: { data: PluginRegistryData }) {
             </div>
             {filtered.length ? (
               <div className={`plugin-results plugin-results--${view}`}>
-                {filtered.map((plugin) => (
+                {visiblePlugins.map((plugin) => (
                   <PluginCard
                     key={plugin.id}
                     plugin={plugin}
                     lang={lang}
                     favorite={favorites.includes(plugin.id)}
-                    onOpen={() => setSelected(plugin)}
+                    onOpen={() => openPlugin(plugin)}
                     onFavorite={() => toggleFavorite(plugin.id)}
                     view={view}
                   />
@@ -511,6 +632,7 @@ export function PluginHub({ data: initialData }: { data: PluginRegistryData }) {
             ) : (
               <div className="empty-state"><strong>{text(lang, "没有匹配的插件", "No matching plugins")}</strong><p>{text(lang, "换个关键词或清空筛选条件。", "Try another keyword or reset the filters.")}</p><button type="button" onClick={() => { setQuery(""); setCategory("all"); setEvidence("all"); }}>{text(lang, "清空筛选", "Reset filters")}</button></div>
             )}
+            {visiblePlugins.length < filtered.length && <button className="load-more" type="button" onClick={() => setVisibleWindow({ key: filterKey, count: visibleCount + RESULT_BATCH_SIZE })}>{text(lang, `加载更多（还有 ${filtered.length - visiblePlugins.length} 个）`, `Load more (${filtered.length - visiblePlugins.length} remaining)`)}</button>}
           </section>
         )}
 
@@ -520,11 +642,11 @@ export function PluginHub({ data: initialData }: { data: PluginRegistryData }) {
             <div className="rank-grid">
               <div className="rank-panel">
                 <div className="rank-panel__heading"><span>★</span><div><h2>{text(lang, "按星标", "By stars")}</h2><p>{text(lang, "社区关注度", "Community attention")}</p></div></div>
-                <ol>{topStars.map((plugin, index) => <li key={plugin.id}><button type="button" onClick={() => setSelected(plugin)}><b>{String(index + 1).padStart(2, "0")}</b><span><strong>{plugin.name}</strong><small>{plugin.owner}</small></span><em>★ {formatNumber(plugin.stars, lang)}</em></button></li>)}</ol>
+                <ol>{topStars.map((plugin, index) => <li key={plugin.id}><button type="button" onClick={() => openPlugin(plugin)}><b>{String(index + 1).padStart(2, "0")}</b><span><strong>{plugin.name}</strong><small>{plugin.owner}</small></span><em>★ {formatNumber(plugin.stars, lang)}</em></button></li>)}</ol>
               </div>
               <div className="rank-panel">
                 <div className="rank-panel__heading"><span>↻</span><div><h2>{text(lang, "最近更新", "Recently pushed")}</h2><p>{text(lang, "维护活跃度", "Maintenance activity")}</p></div></div>
-                <ol>{topFresh.map((plugin, index) => <li key={plugin.id}><button type="button" onClick={() => setSelected(plugin)}><b>{String(index + 1).padStart(2, "0")}</b><span><strong>{plugin.name}</strong><small>{plugin.owner}</small></span><em>{relativeDate(plugin.pushedAt, lang)}</em></button></li>)}</ol>
+                <ol>{topFresh.map((plugin, index) => <li key={plugin.id}><button type="button" onClick={() => openPlugin(plugin)}><b>{String(index + 1).padStart(2, "0")}</b><span><strong>{plugin.name}</strong><small>{plugin.owner}</small></span><em>{relativeDate(plugin.pushedAt, lang)}</em></button></li>)}</ol>
               </div>
             </div>
           </section>
@@ -541,6 +663,13 @@ export function PluginHub({ data: initialData }: { data: PluginRegistryData }) {
                 ["04", "AUTO SCAN", "网站每 30 分钟发现一次，并按 manifest、安装脚本和入口源码信号分级。", "The site discovers repositories every 30 minutes and grades manifest, install-script, and entrypoint signals."],
               ].map(([no, title, zh, en]) => <div className="process-card" key={no}><b>{no}</b><strong>{title}</strong><p>{text(lang, zh, en)}</p></div>)}
             </div>
+            <form className="repository-check" onSubmit={checkRepository}>
+              <div><span className="section-kicker">QUICK CHECK</span><h2>{text(lang, "先检查仓库是否满足收录条件", "Check listing readiness")}</h2><p>{text(lang, "这里只读取公开仓库信息和 package.json，不执行任何代码。", "This reads public repository metadata and package.json only; no code is executed.")}</p></div>
+              <label><span>{text(lang, "GitHub 仓库地址", "GitHub repository URL")}</span><div><input type="url" required maxLength={300} value={repositoryUrl} onChange={(event) => setRepositoryUrl(event.target.value)} aria-label={text(lang, "GitHub 仓库地址", "GitHub repository URL")} placeholder="https://github.com/owner/repository" /><button className="primary-button" type="submit" disabled={preflight?.loading}>{preflight?.loading ? text(lang, "检查中…", "Checking…") : text(lang, "立即检查", "Check now")}</button></div></label>
+              {preflight && !preflight.loading && <div className={`repository-result ${preflight.error ? "is-error" : preflight.eligible ? "is-clear" : "is-review"}`} role="status">
+                {preflight.error ? <p>{preflight.error}</p> : <><strong>{preflight.eligible ? text(lang, "已满足自动发现条件", "Ready for automatic discovery") : text(lang, "还需要补充信息", "More information is needed")}</strong><ul><li>{text(lang, "dsh-plugin Topic", "dsh-plugin topic")}：{preflight.topic ? "✓" : "×"}</li><li>DSH manifest：{preflight.manifest === "verified" ? "✓" : preflight.manifest}</li></ul></>}
+              </div>}
+            </form>
             <div className="callout"><div><span className="section-kicker">SUBMIT</span><h2>{text(lang, "公开链路", "Public paths")}</h2></div><div className="callout__links"><a href="https://github.com/topics/dsh-plugin" target="_blank" rel="noreferrer">GitHub topic ↗</a><a href={data.sources.curated.repository} target="_blank" rel="noreferrer">awesome-dsh-plugin ↗</a></div></div>
           </section>
         )}
@@ -564,20 +693,21 @@ export function PluginHub({ data: initialData }: { data: PluginRegistryData }) {
       </main>
 
       <footer className="site-footer">
-        <div className="shell"><span>DSH PLUGIN HUB · {data.summary.listed} LISTED · {data.summary.autoDiscovered} AUTO · 30 MIN</span><span>{text(lang, "社区索引 · 作者：岚叔 · 与 DeepSeek AI 无隶属关系", "Community index · Author: 岚叔 · not affiliated with DeepSeek AI")}</span><a href="/api/plugins">JSON API</a></div>
+        <div className="shell"><span>DSH PLUGIN HUB · {data.summary.listed} LISTED · {data.summary.autoDiscovered} AUTO · 30 MIN</span><span>{text(lang, "社区索引 · 作者：岚叔 · 与 DeepSeek AI 无隶属关系", "Community index · Author: 岚叔 · not affiliated with DeepSeek AI")}</span><Link href="/api/plugins">JSON API</Link></div>
       </footer>
+      </div>
 
       {selected && (
         <div className="drawer-layer" role="presentation">
-          <button className="drawer-backdrop" type="button" onClick={() => setSelected(null)} aria-label={text(lang, "关闭详情", "Close details")} />
-          <aside className="plugin-drawer" role="dialog" aria-modal="true" aria-labelledby="plugin-title">
-            <div className="plugin-drawer__top"><span>PLUGIN {String(selected.order + 1).padStart(3, "0")}</span><button type="button" onClick={() => setSelected(null)} aria-label={text(lang, "关闭", "Close")}>×</button></div>
+          <button className="drawer-backdrop" type="button" onClick={closeSelected} aria-label={text(lang, "关闭详情", "Close details")} tabIndex={-1} />
+          <aside ref={drawerRef} className="plugin-drawer" role="dialog" aria-modal="true" aria-labelledby="plugin-title" aria-describedby="plugin-description">
+            <div className="plugin-drawer__top"><span>PLUGIN {String(selected.order + 1).padStart(3, "0")}</span><button ref={closeButtonRef} type="button" onClick={closeSelected} aria-label={text(lang, "关闭", "Close")}>×</button></div>
             <div className="plugin-drawer__body">
               <div className="plugin-drawer__badges"><span className={`evidence evidence--${sourceClass(selected)}`}>{sourceLabel(selected)}</span><span className={`signal signal--${selected.attention.level}`}>{signalLabel(selected, lang)}</span></div>
               <h2 id="plugin-title">{selected.name}</h2>
               <p className="drawer-owner">{selected.owner} · {data.categories[selected.category][lang]}</p>
               <div className="stat-chips"><span>★ {formatNumber(selected.stars, lang)}</span><span>{relativeDate(selected.pushedAt, lang)}</span><span>{selected.license || text(lang, "许可证未声明", "License missing")}</span><span>{selected.language || text(lang, "语言未知", "Language unknown")}</span></div>
-              <p className="drawer-description">{selected.description[lang]}</p>
+              <p className="drawer-description" id="plugin-description">{selected.description[lang]}</p>
 
               <div className="drawer-section"><span className="drawer-label">{text(lang, "安装证据", "INSTALL EVIDENCE")}</span>
                 {selected.installCommand ? <><p>{text(lang, "命令已锁定到完成检查的 Git commit；执行前仍建议阅读完整源码。", "The command is pinned to the inspected Git commit. Review the complete source before running it.")}</p><div className="code-panel code-panel--drawer"><code>{selected.installCommand}</code><button type="button" onClick={() => copy(selected.installCommand || "", selected.id)}>{copied === selected.id ? text(lang, "已复制", "Copied") : text(lang, "复制", "Copy")}</button></div></> : <p className="warning-copy">{text(lang, "当前证据不足或风险信号需要人工复核，网站暂不提供安装命令。请先查看检查项与完整源码。", "Evidence is currently insufficient or risk signals need manual review, so no install command is shown. Review the findings and complete source first.")}</p>}
@@ -606,6 +736,7 @@ export function PluginHub({ data: initialData }: { data: PluginRegistryData }) {
           </aside>
         </div>
       )}
+      {copyMessage && <div className="toast" role="status" aria-live="polite">{copyMessage}</div>}
     </div>
   );
 }

@@ -1,0 +1,21 @@
+[Unit]
+Description=Synchronize DSH Plugin Hub registry
+After=network-online.target dsh-plugin-hub.service
+Requires=dsh-plugin-hub.service
+
+[Service]
+Type=oneshot
+User=deploy
+Group=deploy
+WorkingDirectory=/home/deploy/apps/dsh-plugin-hub/current
+EnvironmentFile=/etc/dsh-plugin-hub/dsh-plugin-hub.env
+Environment=PORT=18200
+ExecStart=/home/deploy/.local/node22/bin/node /home/deploy/apps/dsh-plugin-hub/current/scripts/run-sync.mjs
+TimeoutStartSec=16min
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
