@@ -16,6 +16,7 @@ import {
   markInspectionUnavailable,
   manifestSummary,
   normalizeRepositoryPath,
+  repositoryRootFiles,
   sanitizeRegistryInstallEvidence,
   screenRepository,
 } from "../lib/plugin-screening.mjs";
@@ -345,7 +346,15 @@ async function inspectRepository(meta: GithubRepository, env: PluginRegistryEnv)
   const repo = validateRepoName(meta.full_name);
   const branch = meta.default_branch || "main";
   const commitSha = await resolveCommitSha(repo, branch, env);
-  const packageText = await fetchRaw(repo, commitSha, "package.json");
+  const [packageText, rootTree] = await Promise.all([
+    fetchRaw(repo, commitSha, "package.json"),
+    fetchJson<unknown>(
+      `https://api.github.com/repos/${repo}/git/trees/${encodeURIComponent(commitSha)}`,
+      env,
+      MAX_JSON_BYTES,
+    ),
+  ]);
+  const rootFiles = repositoryRootFiles(rootTree);
   if (!packageText) return { outcome: "rejected" as const, reason: "package.json missing" };
 
   let pkg: unknown;
@@ -359,7 +368,7 @@ async function inspectRepository(meta: GithubRepository, env: PluginRegistryEnv)
     return { outcome: "rejected" as const, reason: "dsh manifest missing", manifest };
   }
 
-  const readmePath = "README.md";
+  const readmePath = rootFiles.find((filePath) => /^readme(?:\.[^/]+)?$/iu.test(filePath)) || null;
   const sourcePaths = selectSourcePaths(manifest);
   const [readme, ...sourceTexts] = await Promise.all([
     readmePath ? fetchRaw(repo, commitSha, readmePath) : Promise.resolve(null),
@@ -369,7 +378,6 @@ async function inspectRepository(meta: GithubRepository, env: PluginRegistryEnv)
     const text = sourceTexts[index];
     return typeof text === "string" ? [{ path: filePath, text }] : [];
   });
-  const rootFiles = ["package.json", ...(readme ? [readmePath] : [])];
   const screening = screenRepository({
     meta,
     manifest,
@@ -507,7 +515,9 @@ function normalizeDescription(value: string) {
 }
 
 function scanLimit(env: PluginRegistryEnv) {
-  const defaultLimit = env.GITHUB_TOKEN?.trim() ? MAX_SCANS_PER_RUN : 2;
+  // Two search calls plus two API calls per scan keep seven anonymous scans
+  // below GitHub's 60-request hourly allowance, including public preflights.
+  const defaultLimit = MAX_SCANS_PER_RUN;
   const parsed = Number(env.REGISTRY_SCAN_LIMIT || defaultLimit);
   return Number.isInteger(parsed) ? Math.min(50, Math.max(1, parsed)) : MAX_SCANS_PER_RUN;
 }

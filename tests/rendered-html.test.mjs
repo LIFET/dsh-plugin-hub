@@ -86,6 +86,9 @@ test("server-renders the complete plugin hub", async () => {
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
   assert.equal(response.headers.get("x-content-type-options"), "nosniff");
   assert.equal(response.headers.get("x-frame-options"), "DENY");
+  assert.match(response.headers.get("strict-transport-security") ?? "", /max-age=63072000/u);
+  assert.match(response.headers.get("content-security-policy") ?? "", /default-src 'self'/u);
+  assert.equal(response.headers.get("x-powered-by"), null);
 
   const html = await response.text();
   assert.match(html, /<title>DSH 插件资源站<\/title>/i);
@@ -99,6 +102,8 @@ test("server-renders the complete plugin hub", async () => {
   assert.match(html, /自动发现/);
   assert.match(html, /作者：岚叔/);
   assert.match(html, /JSON API/);
+  assert.match(html, /href="\/plugins"/);
+  assert.ok(Buffer.byteLength(html) < 180_000, `home payload is ${Buffer.byteLength(html)} bytes`);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton|Your site is taking shape/i);
 });
 
@@ -122,6 +127,17 @@ test("serves shareable pages and plugin detail metadata", async () => {
   assert.match(html, new RegExp(`<title>${plugin.name.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}`));
   assert.match(html, /role="dialog"/);
   assert.match(html, new RegExp(`rel="canonical" href="https://apiu.cc/plugin/${plugin.id}`));
+});
+
+test("server-renders saved language and theme preferences", async () => {
+  const response = await fetch(`${baseUrl}/plugins`, {
+    headers: { Cookie: "dsh-plugin-hub-lang=en; dsh-plugin-hub-theme=dark" },
+  });
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /<html lang="en" data-theme="dark"/u);
+  assert.match(html, /<title>Plugin catalog · DSH Plugin Hub<\/title>/u);
+  assert.match(html, /Plugin catalog/u);
 });
 
 test("serves the real registry through the JSON API", async () => {
@@ -172,6 +188,47 @@ test("rejects invalid public repository preflight input without upstream access"
   assert.match((await response.json()).error, /只支持|GitHub/u);
 });
 
+test("rejects an oversized chunked preflight body", async () => {
+  const payload = JSON.stringify({ url: `https://github.com/${"a".repeat(2_100)}` });
+  const response = await fetch(`${baseUrl}/api/repository/check`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Real-IP": "192.0.2.100",
+    },
+    body: new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(payload));
+        controller.close();
+      },
+    }),
+    duplex: "half",
+  });
+  assert.equal(response.status, 413);
+});
+
+test("serves crawl metadata and a branded not-found page", async () => {
+  const robots = await request("/robots.txt", "text/plain");
+  assert.equal(robots.status, 200);
+  assert.match(await robots.text(), /Sitemap: https:\/\/apiu\.cc\/sitemap\.xml/u);
+
+  const sitemap = await request("/sitemap.xml", "application/xml");
+  assert.equal(sitemap.status, 200);
+  assert.match(await sitemap.text(), /https:\/\/apiu\.cc\/plugin\//u);
+
+  const missing = await request("/does-not-exist");
+  assert.equal(missing.status, 404);
+  assert.match(await missing.text(), /这里没有插件/u);
+});
+
+test("localizes the not-found page from the saved language", async () => {
+  const response = await fetch(`${baseUrl}/missing-plugin`, {
+    headers: { Cookie: "dsh-plugin-hub-lang=en" },
+  });
+  assert.equal(response.status, 404);
+  assert.match(await response.text(), /No plugin here/u);
+});
+
 test("reads a persisted registry from the self-hosted file store", async () => {
   const registry = JSON.parse(await readFile(new URL("data/plugins.generated.json", root), "utf8"));
   registry.generatedAt = "2026-08-15T00:00:00.000Z";
@@ -217,6 +274,9 @@ test("copies public assets into standalone output", async () => {
   const response = await request("/favicon.svg", "image/svg+xml");
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /image\/svg\+xml/i);
+  const socialImage = await request("/og.jpg", "image/jpeg");
+  assert.equal(socialImage.status, 200);
+  assert.match(socialImage.headers.get("content-type") ?? "", /image\/jpeg/i);
 });
 
 test("keeps the generated registry internally consistent", async () => {

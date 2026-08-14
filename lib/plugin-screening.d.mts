@@ -37,6 +37,7 @@ export interface ScreeningResult {
 }
 
 export function normalizeRepositoryPath(value: unknown): string | null;
+export function repositoryRootFiles(value: unknown): string[];
 export function manifestSummary(pkg: unknown, branch: string | null): ScreeningManifest;
 export function baselineScreening(meta: unknown, manifest: ScreeningManifest, files?: string[], checkedAt?: string): ScreeningResult;
 export function screenRepository(input: {

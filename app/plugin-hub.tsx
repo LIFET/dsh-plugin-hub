@@ -7,7 +7,7 @@ import type {
   PluginRegistryData,
 } from "@/lib/plugin-data";
 import Link from "next/link";
-import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type FormEvent, type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type PageId = "home" | "catalog" | "rank" | "submit" | "guide";
 type SortId = "curated" | "stars" | "updated" | "added" | "name";
@@ -16,9 +16,9 @@ type EvidenceFilter = "all" | "auto" | "topic" | "manifest" | "clear" | "review"
 const PAGES: Array<{ id: PageId; zh: string; en: string }> = [
   { id: "home", zh: "首页", en: "Home" },
   { id: "catalog", zh: "目录", en: "Catalog" },
-  { id: "rank", zh: "排行榜", en: "Leaderboard" },
-  { id: "submit", zh: "收录", en: "Get listed" },
-  { id: "guide", zh: "开发指南", en: "Build one" },
+  { id: "rank", zh: "排行榜", en: "Rank" },
+  { id: "submit", zh: "收录", en: "Submit" },
+  { id: "guide", zh: "开发指南", en: "Guide" },
 ];
 
 const CATEGORY_ORDER: CategoryId[] = [
@@ -90,6 +90,12 @@ function pluginPath(plugin: PluginRecord) {
   return `/plugin/${plugin.id.split("/").map(encodeURIComponent).join("/")}`;
 }
 
+function openInDrawer(event: MouseEvent<HTMLAnchorElement>, onOpen: () => void) {
+  if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  event.preventDefault();
+  onOpen();
+}
+
 function maintenanceLabel(plugin: PluginRecord, lang: Language) {
   const labels = {
     active: text(lang, "近 30 天活跃", "Active in 30d"),
@@ -135,7 +141,7 @@ function PluginCard({
 }) {
   return (
     <article className={`plugin-card plugin-card--${view}`}>
-      <button className="plugin-card__main" type="button" onClick={onOpen}>
+      <Link className="plugin-card__main" href={pluginPath(plugin)} prefetch={false} onClick={(event) => openInDrawer(event, onOpen)}>
         <span className="plugin-card__number">№ {String(plugin.order + 1).padStart(3, "0")}</span>
         <span className="plugin-card__copy">
           <span className="plugin-card__title-row">
@@ -153,7 +159,7 @@ function PluginCard({
             <span className={`signal signal--${plugin.attention.level}`}>{signalLabel(plugin, lang)}</span>
           </span>
         </span>
-      </button>
+      </Link>
       <button
         className={`favorite-button ${favorite ? "is-active" : ""}`}
         type="button"
@@ -172,17 +178,25 @@ export function PluginHub({
   initialPage = "home",
   initialPluginId = null,
   initialSource = "bundled",
+  initialLanguage = "zh",
+  initialTheme = "light",
+  initialCategoryCounts,
+  initialInspectedCount,
 }: {
   data: PluginRegistryData;
   initialPage?: PageId;
   initialPluginId?: string | null;
   initialSource?: "bundled" | "live";
+  initialLanguage?: Language;
+  initialTheme?: "dark" | "light";
+  initialCategoryCounts?: Record<CategoryId, number>;
+  initialInspectedCount?: number;
 }) {
   const data = initialData;
   const [registrySource] = useState<"bundled" | "live">(initialSource);
   const [page, setPage] = useState<PageId>(initialPage);
-  const [lang, setLang] = useState<Language>("zh");
-  const [theme, setTheme] = useState<"dark" | "light">("light");
+  const [lang, setLang] = useState<Language>(initialLanguage);
+  const [theme, setTheme] = useState<"dark" | "light">(initialTheme);
   const [preferencesReady, setPreferencesReady] = useState(false);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<"all" | CategoryId>("all");
@@ -257,6 +271,8 @@ export function PluginHub({
     if (!preferencesReady) return;
     try {
       localStorage.setItem(PREFS_KEY, JSON.stringify({ lang, theme, view, favorites }));
+      document.cookie = `dsh-plugin-hub-lang=${lang}; Path=/; Max-Age=31536000; SameSite=Lax`;
+      document.cookie = `dsh-plugin-hub-theme=${theme}; Path=/; Max-Age=31536000; SameSite=Lax`;
     } catch {
       // Preferences are optional when storage is unavailable.
     }
@@ -268,14 +284,6 @@ export function PluginHub({
       ? text(lang, "DSH 插件资源站", "DSH Plugin Hub")
       : `${pageTitle} · ${text(lang, "DSH 插件资源站", "DSH Plugin Hub")}`;
   }, [lang, page, selected]);
-
-  const go = useCallback((next: PageId) => {
-    setPage(next);
-    setSelected(null);
-    window.history.pushState(null, "", PAGE_PATHS[next]);
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    window.scrollTo({ top: 0, behavior: reduced ? "auto" : "smooth" });
-  }, []);
 
   const openPlugin = useCallback((plugin: PluginRecord) => {
     returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -361,11 +369,12 @@ export function PluginHub({
     }
   }, [lang, repositoryUrl]);
 
-  const categoryCounts = useMemo(() => {
+  const computedCategoryCounts = useMemo(() => {
     const counts = Object.fromEntries(CATEGORY_ORDER.map((id) => [id, 0])) as Record<CategoryId, number>;
     for (const plugin of data.plugins) counts[plugin.category] += 1;
     return counts;
   }, [data.plugins]);
+  const categoryCounts = initialCategoryCounts || computedCategoryCounts;
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -416,7 +425,8 @@ export function PluginHub({
   const filterKey = `${query}\u0000${category}\u0000${sort}\u0000${evidence}`;
   const visibleCount = visibleWindow.key === filterKey ? visibleWindow.count : RESULT_BATCH_SIZE;
   const visiblePlugins = filtered.slice(0, visibleCount);
-  const inspectedCount = data.plugins.filter((plugin) => plugin.screening.scope === "source").length;
+  const inspectedCount = initialInspectedCount
+    ?? data.plugins.filter((plugin) => plugin.screening.scope === "source").length;
 
   const topStars = useMemo(
     () => [...data.plugins].filter((plugin) => plugin.stars !== null).sort((a, b) => (b.stars || 0) - (a.stars || 0)).slice(0, 20),
@@ -429,7 +439,7 @@ export function PluginHub({
   const featured = topStars.slice(0, 6);
   const generatedLabel = data.generatedAt.slice(0, 16).replace("T", " ") + " UTC";
   const automationLabel = data.automation.state === "live"
-    ? text(lang, "自动巡检正常", "Automated scan healthy")
+    ? text(lang, "自动同步正常", "Automated sync healthy")
     : data.automation.state === "degraded"
       ? text(lang, "巡检部分降级", "Scan partially degraded")
       : text(lang, "等待首次自动巡检", "Awaiting first automated scan");
@@ -442,37 +452,34 @@ export function PluginHub({
       <div className="site-frame" inert={selected ? true : undefined}>
       <header className="site-header">
         <div className="site-header__inner">
-          <button className="brand" type="button" onClick={() => go("home")}>
+          <Link className="brand" href="/" prefetch={false}>
             <span className="brand__mark">dsh</span>
             <span className="brand__name">{text(lang, "插件资源站", "Plugin Hub")}</span>
             <span className="sr-only">{text(lang, "，返回首页", ", back home")}</span>
-          </button>
+          </Link>
           <nav className="main-nav" aria-label={text(lang, "主导航", "Main navigation")}>
             {PAGES.map((item) => (
-              <button
+              <Link
                 className={page === item.id ? "is-active" : ""}
-                type="button"
+                href={PAGE_PATHS[item.id]}
+                prefetch={false}
                 key={item.id}
-                onClick={() => go(item.id)}
                 aria-current={page === item.id ? "page" : undefined}
               >
                 {item[lang]}
-              </button>
+              </Link>
             ))}
           </nav>
           <div className="header-actions">
-            <button
-              className={evidence === "favorites" ? "is-active" : ""}
-              type="button"
-              onClick={() => {
-                setEvidence("favorites");
-                go("catalog");
-              }}
+            <Link
+              className={`favorite-link ${evidence === "favorites" ? "is-active" : ""}`}
+              href="/plugins?evidence=favorites"
+              prefetch={false}
               title={text(lang, "查看收藏", "View favorites")}
               aria-label={text(lang, `查看收藏，${favorites.length} 项`, `View ${favorites.length} saved plugins`)}
             >
               ★ <span>{favorites.length}</span>
-            </button>
+            </Link>
             <button type="button" onClick={() => setLang((current) => (current === "zh" ? "en" : "zh"))}>
               {lang === "zh" ? "EN" : "中文"}
             </button>
@@ -500,7 +507,7 @@ export function PluginHub({
                   )}
                 </p>
                 <div className="hero__actions">
-                  <button className="primary-button" type="button" onClick={() => go("catalog")}>{text(lang, "浏览插件目录", "Browse catalog")} <span>→</span></button>
+                  <Link className="primary-button" href="/plugins" prefetch={false}>{text(lang, "浏览插件目录", "Browse catalog")} <span>→</span></Link>
                   <a className="secondary-button" href={data.sources.curated.repository} target="_blank" rel="noreferrer">{text(lang, "查看数据源", "Open data source")} ↗</a>
                 </div>
                 <details className="scan-status">
@@ -525,17 +532,17 @@ export function PluginHub({
             <section className="section shell">
               <div className="section-heading">
                 <div><span className="section-kicker">COMMUNITY SIGNAL</span><h2>{text(lang, "社区热度", "Community signal")}</h2></div>
-                <button className="text-button" type="button" onClick={() => go("rank")}>{text(lang, "完整排行榜", "Full leaderboard")} →</button>
+                <Link className="text-button" href="/rank" prefetch={false}>{text(lang, "完整排行榜", "Full leaderboard")} →</Link>
               </div>
               <div className="featured-grid">
                 {featured.map((plugin, index) => (
-                  <button className="featured-card" type="button" key={plugin.id} onClick={() => openPlugin(plugin)}>
+                  <Link className="featured-card" href={pluginPath(plugin)} prefetch={false} key={plugin.id} onClick={(event) => openInDrawer(event, () => openPlugin(plugin))}>
                     <span className="featured-card__rank">0{index + 1}</span>
                     <span className="featured-card__head"><strong>{plugin.name}</strong><em>★ {formatNumber(plugin.stars, lang)}</em></span>
                     <span className="featured-card__owner">{plugin.owner}</span>
                     <span className="featured-card__desc">{plugin.description[lang]}</span>
                     <span className="featured-card__foot">{data.categories[plugin.category][lang]} <i>→</i></span>
-                  </button>
+                  </Link>
                 ))}
               </div>
             </section>
@@ -544,19 +551,16 @@ export function PluginHub({
               <div className="section-heading"><div><span className="section-kicker">BROWSE</span><h2>{text(lang, "按分类逛", "Browse by category")}</h2></div></div>
               <div className="category-grid">
                 {CATEGORY_ORDER.map((id) => (
-                  <button
+                  <Link
                     className="category-card"
-                    type="button"
+                    href={`/plugins?category=${id}`}
+                    prefetch={false}
                     key={id}
-                    onClick={() => {
-                      setCategory(id);
-                      go("catalog");
-                    }}
                   >
                     <strong>{categoryCounts[id]}</strong>
                     <span>{data.categories[id][lang]}</span>
                     <small>{CATEGORY_HINTS[id][lang]}</small>
-                  </button>
+                  </Link>
                 ))}
               </div>
             </section>
@@ -610,9 +614,9 @@ export function PluginHub({
               </div>
             </div>
             <div className="category-chips">
-              <button className={category === "all" ? "is-active" : ""} type="button" onClick={() => setCategory("all")}>{text(lang, "全部", "All")} <small>{data.plugins.length}</small></button>
+              <button className={category === "all" ? "is-active" : ""} type="button" onClick={() => setCategory("all")} aria-pressed={category === "all"}>{text(lang, "全部", "All")} <small>{data.summary.listed}</small></button>
               {CATEGORY_ORDER.map((id) => (
-                <button className={category === id ? "is-active" : ""} type="button" key={id} onClick={() => setCategory(id)}>{data.categories[id][lang]} <small>{categoryCounts[id]}</small></button>
+                <button className={category === id ? "is-active" : ""} type="button" key={id} onClick={() => setCategory(id)} aria-pressed={category === id}>{data.categories[id][lang]} <small>{categoryCounts[id]}</small></button>
               ))}
             </div>
             {filtered.length ? (
@@ -642,11 +646,11 @@ export function PluginHub({
             <div className="rank-grid">
               <div className="rank-panel">
                 <div className="rank-panel__heading"><span>★</span><div><h2>{text(lang, "按星标", "By stars")}</h2><p>{text(lang, "社区关注度", "Community attention")}</p></div></div>
-                <ol>{topStars.map((plugin, index) => <li key={plugin.id}><button type="button" onClick={() => openPlugin(plugin)}><b>{String(index + 1).padStart(2, "0")}</b><span><strong>{plugin.name}</strong><small>{plugin.owner}</small></span><em>★ {formatNumber(plugin.stars, lang)}</em></button></li>)}</ol>
+                <ol>{topStars.map((plugin, index) => <li key={plugin.id}><Link href={pluginPath(plugin)} prefetch={false} onClick={(event) => openInDrawer(event, () => openPlugin(plugin))}><b>{String(index + 1).padStart(2, "0")}</b><span><strong>{plugin.name}</strong><small>{plugin.owner}</small></span><em>★ {formatNumber(plugin.stars, lang)}</em></Link></li>)}</ol>
               </div>
               <div className="rank-panel">
                 <div className="rank-panel__heading"><span>↻</span><div><h2>{text(lang, "最近更新", "Recently pushed")}</h2><p>{text(lang, "维护活跃度", "Maintenance activity")}</p></div></div>
-                <ol>{topFresh.map((plugin, index) => <li key={plugin.id}><button type="button" onClick={() => openPlugin(plugin)}><b>{String(index + 1).padStart(2, "0")}</b><span><strong>{plugin.name}</strong><small>{plugin.owner}</small></span><em>{relativeDate(plugin.pushedAt, lang)}</em></button></li>)}</ol>
+                <ol>{topFresh.map((plugin, index) => <li key={plugin.id}><Link href={pluginPath(plugin)} prefetch={false} onClick={(event) => openInDrawer(event, () => openPlugin(plugin))}><b>{String(index + 1).padStart(2, "0")}</b><span><strong>{plugin.name}</strong><small>{plugin.owner}</small></span><em>{relativeDate(plugin.pushedAt, lang)}</em></Link></li>)}</ol>
               </div>
             </div>
           </section>
@@ -704,7 +708,7 @@ export function PluginHub({
             <div className="plugin-drawer__top"><span>PLUGIN {String(selected.order + 1).padStart(3, "0")}</span><button ref={closeButtonRef} type="button" onClick={closeSelected} aria-label={text(lang, "关闭", "Close")}>×</button></div>
             <div className="plugin-drawer__body">
               <div className="plugin-drawer__badges"><span className={`evidence evidence--${sourceClass(selected)}`}>{sourceLabel(selected)}</span><span className={`signal signal--${selected.attention.level}`}>{signalLabel(selected, lang)}</span></div>
-              <h2 id="plugin-title">{selected.name}</h2>
+              <h1 id="plugin-title">{selected.name}</h1>
               <p className="drawer-owner">{selected.owner} · {data.categories[selected.category][lang]}</p>
               <div className="stat-chips"><span>★ {formatNumber(selected.stars, lang)}</span><span>{relativeDate(selected.pushedAt, lang)}</span><span>{selected.license || text(lang, "许可证未声明", "License missing")}</span><span>{selected.language || text(lang, "语言未知", "Language unknown")}</span></div>
               <p className="drawer-description" id="plugin-description">{selected.description[lang]}</p>
