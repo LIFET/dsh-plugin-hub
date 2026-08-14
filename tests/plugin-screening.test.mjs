@@ -6,6 +6,7 @@ import {
   markInspectionUnavailable,
   manifestSummary,
   normalizeRepositoryPath,
+  repositoryRootFiles,
   sanitizeRegistryInstallEvidence,
   screenRepository,
 } from "../lib/plugin-screening.mjs";
@@ -37,6 +38,29 @@ test("normalizes only repository-relative declared paths", () => {
   assert.equal(normalizeRepositoryPath("../outside.ts"), null);
   assert.equal(normalizeRepositoryPath("/etc/passwd"), null);
   assert.equal(normalizeRepositoryPath("https://example.com/a.js"), null);
+});
+
+test("uses the authoritative root tree when checking repository evidence", () => {
+  const files = repositoryRootFiles({
+    truncated: false,
+    tree: [
+      { type: "blob", path: "package.json" },
+      { type: "blob", path: "README.rst" },
+      { type: "blob", path: "pnpm-lock.yaml" },
+      { type: "tree", path: "src" },
+    ],
+  });
+  const result = screenRepository({
+    meta: safeMeta,
+    manifest: manifest(),
+    files,
+    sourceFiles: [{ path: "lib/index.js", text: "export default {};" }],
+    readme: "Security and permissions",
+  });
+  assert.equal(result.state, "clear");
+  assert.equal(result.checks.lockfile, true);
+  assert.equal(result.checks.readme, true);
+  assert.throws(() => repositoryRootFiles({ truncated: true, tree: [] }), /incomplete/u);
 });
 
 test("marks a fully inspectable local-only plugin as clear", () => {

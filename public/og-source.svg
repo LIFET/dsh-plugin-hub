@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <pattern id="grid" width="52" height="52" patternUnits="userSpaceOnUse">
+      <path d="M52 0H0V52" fill="none" stroke="#243052" stroke-width="1"/>
+    </pattern>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientTransform="translate(292 315) rotate(90) scale(300)">
+      <stop stop-color="#5360ff" stop-opacity=".46"/>
+      <stop offset="1" stop-color="#5360ff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="mark" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#5360ff"/>
+      <stop offset="1" stop-color="#3440d4"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="#0b0f19"/>
+  <rect width="1200" height="630" fill="url(#grid)" opacity=".62"/>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+  <rect x="104" y="206" width="210" height="210" rx="50" fill="url(#mark)"/>
+  <text x="209" y="342" fill="#fff" font-family="SFMono-Regular, Menlo, monospace" font-size="82" font-weight="700" text-anchor="middle">dsh</text>
+  <text x="376" y="286" fill="#f7f8fc" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="72" font-weight="700">DSH 插件资源站</text>
+  <text x="380" y="352" fill="#8f98ad" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="27">先看证据，再决定装不装。</text>
+  <g transform="translate(380 389)" font-family="SFMono-Regular, Menlo, monospace" font-size="18" font-weight="700">
+    <rect width="196" height="42" rx="21" fill="#17213b" stroke="#354371"/>
+    <text x="98" y="27" fill="#9aa3ff" text-anchor="middle">REAL GITHUB DATA</text>
+    <rect x="210" width="196" height="42" rx="21" fill="#17213b" stroke="#354371"/>
+    <text x="308" y="27" fill="#9aa3ff" text-anchor="middle">MANIFEST EVIDENCE</text>
+    <rect x="420" width="166" height="42" rx="21" fill="#17213b" stroke="#354371"/>
+    <text x="503" y="27" fill="#9aa3ff" text-anchor="middle">30 MIN SYNC</text>
+  </g>
+</svg>
