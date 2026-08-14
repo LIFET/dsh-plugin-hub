@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #0E0F11; --bg2: #131519; --bg3: #191C21; --chip: #1A1D22;
+    --line: #23262C; --line2: #2E323A;
+    --fg: #E8E9EB; --fg2: #A2A6AE; --fg3: #6C7078;
+    --ac: #2C33D4; --ac2: #8E93FF; --acsoft: rgba(44,51,212,0.18);
+    --star: #E0A32E; --ok: #3FB27F;
+  }
+  [data-theme="light"] {
+    --bg: #F6F6F3; --bg2: #FFFFFF; --bg3: #EFEFEC; --chip: #EDEDEA;
+    --line: #E2E2DC; --line2: #CFCFC8;
+    --fg: #15171A; --fg2: #565A60; --fg3: #85898F;
+    --ac: #2C33D4; --ac2: #2C33D4; --acsoft: rgba(44,51,212,0.10);
+    --star: #B7810E; --ok: #1E8A5C;
+  }
+  html { -webkit-font-smoothing: antialiased; }
+  body { margin: 0; background: #0E0F11; }
+  * { box-sizing: border-box; }
+  a { color: var(--ac2); text-decoration: none; }
+  a:hover { color: var(--fg); }
+  ::selection { background: var(--ac); color: #fff; }
+  input, select, button, textarea { font: inherit; color: inherit; }
+  input::placeholder { color: var(--fg3); }
+  select option { background: var(--bg2); color: var(--fg); }
+  [data-lang="zh"] [data-l="en"] { display: none; }
+  [data-lang="en"] [data-l="zh"] { display: none; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--line2); border-radius: 6px; }
+  @keyframes slideIn { from { transform: translateX(26px); opacity: 0 } to { transform: none; opacity: 1 } }
+  @keyframes riseIn { from { transform: translateY(14px); opacity: 0 } to { transform: none; opacity: 1 } }
+  @keyframes pulseDot { 0%,100% { opacity: 1 } 50% { opacity: 0.25 } }
+</style>
+</helmet>
+<div data-theme="{{ theme }}" data-lang="{{ lang }}" style="min-height: 100vh; background: var(--bg); color: var(--fg); font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif; font-size: 15px; line-height: 1.6; text-wrap: pretty;">
+
+  <div style="position: sticky; top: 0; z-index: 40; background: var(--bg); border-bottom: 1px solid var(--line);">
+    <div style="max-width: 1400px; margin: 0 auto; padding: 0 clamp(16px, 3vw, 40px); height: 58px; display: flex; align-items: center; gap: clamp(14px, 2vw, 30px);">
+      <button onClick="{{ goHome }}" style="display: flex; align-items: baseline; gap: 9px; background: none; border: none; padding: 0; cursor: pointer;">
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 16px; font-weight: 600; letter-spacing: -0.02em; color: #fff; background: var(--ac); padding: 2px 7px 3px;">dsh</span>
+        <span style="font-size: 14px; font-weight: 600; letter-spacing: 0.01em; white-space: nowrap;"><span data-l="zh">插件资源站</span><span data-l="en">Plugin Hub</span></span>
+      </button>
+      <nav style="display: flex; gap: 3px; overflow-x: auto;">
+        <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="5">
+          <button onClick="{{ t.go }}" style="position: relative; background: none; border: none; padding: 8px 11px; font-size: 13.5px; color: {{ t.fg }}; cursor: pointer; white-space: nowrap; border-radius: 3px;" style-hover="background: var(--bg3)">
+            <span data-l="zh">{{ t.zh }}</span><span data-l="en">{{ t.en }}</span>
+            <sc-if value="{{ t.on }}" hint-placeholder-val="{{ false }}">
+              <span style="position: absolute; left: 11px; right: 11px; bottom: -1px; height: 2px; background: var(--ac);"></span>
+            </sc-if>
+          </button>
+        </sc-for>
+      </nav>
+      <div style="flex: 1;"></div>
+      <button onClick="{{ toggleFavOnly }}" title="收藏" style="display: flex; align-items: center; gap: 6px; background: none; border: 1px solid var(--line2); border-radius: 3px; padding: 5px 10px; cursor: pointer; font-size: 12.5px; color: {{ favBtnFg }};" style-hover="border-color: var(--ac)">
+        <span>★</span><span style="font-family: 'IBM Plex Mono', monospace;">{{ favCount }}</span>
+      </button>
+      <button onClick="{{ toggleLang }}" style="background: none; border: 1px solid var(--line2); border-radius: 3px; padding: 5px 10px; cursor: pointer; font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--fg2);" style-hover="border-color: var(--ac); color: var(--fg)"><span data-l="zh">EN</span><span data-l="en">中文</span></button>
+      <button onClick="{{ toggleTheme }}" style="background: none; border: 1px solid var(--line2); border-radius: 3px; width: 30px; height: 28px; cursor: pointer; font-size: 13px; color: var(--fg2); line-height: 1;" style-hover="border-color: var(--ac); color: var(--fg)">{{ themeIcon }}</button>
+    </div>
+  </div>
+
+  <sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+  <div data-screen-label="首页">
+    <div style="position: relative; border-bottom: 1px solid var(--line); overflow: hidden;">
+      <div style="position: absolute; inset: 0; background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px); background-size: 68px 68px; opacity: 0.55;"></div>
+      <div style="position: absolute; top: -220px; left: 40%; width: 680px; height: 680px; border-radius: 50%; background: radial-gradient(circle, var(--acsoft), transparent 68%);"></div>
+      <div style="position: relative; max-width: 1400px; margin: 0 auto; padding: clamp(52px, 7vw, 88px) clamp(16px, 3vw, 40px) clamp(44px, 5vw, 64px);">
+        <div style="display: flex; align-items: center; gap: 10px; font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; letter-spacing: 0.14em; color: var(--fg3); text-transform: uppercase; margin-bottom: 26px; flex-wrap: wrap;">
+          <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--ok); animation: pulseDot 2.4s ease-in-out infinite;"></span>
+          <span>DeepSeek Harness</span><span style="color: var(--line2);">/</span><span style="color: var(--ac2);">Developer Preview</span>
+        </div>
+        <h1 style="margin: 0 0 22px; font-size: clamp(42px, 6.6vw, 82px); line-height: 0.98; font-weight: 600; letter-spacing: -0.035em; max-width: 15em;">
+          <span data-l="zh">一切皆插件<span style="color: var(--ac);">。</span>社区已经写了 {{ total }} 个。</span>
+          <span data-l="en">Everything is a plugin<span style="color: var(--ac);">.</span> The community wrote {{ total }}.</span>
+        </h1>
+        <p style="margin: 0 0 32px; max-width: 660px; font-size: 17px; line-height: 1.65; color: var(--fg2);">
+          <span data-l="zh">模型、工具、沙箱、会话存储、界面，甚至代理循环本身 —— 在 dsh 里都能换掉。这里是社区插件的落脚点：搜得到、看得懂来路、装得上。</span>
+          <span data-l="en">Models, tools, sandboxes, session storage, the UI, even the agent loop itself — all swappable in dsh. This is where the community's plugins land: searchable, traceable, installable.</span>
+        </p>
+        <div style="display: flex; align-items: stretch; gap: 10px; flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; background: var(--bg2); border: 1px solid var(--line2); border-radius: 3px; max-width: 100%;">
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 14px; padding: 12px 15px; color: var(--fg); white-space: nowrap;"><span style="color: var(--fg3);">$ </span>npx @deepseek-ai/dsh web</span>
+            <button onClick="{{ copyInstall }}" style="border: none; border-left: 1px solid var(--line2); background: var(--bg3); color: var(--fg2); font-size: 12.5px; padding: 12px 14px; cursor: pointer; align-self: stretch; white-space: nowrap;" style-hover="background: var(--ac); color: #fff">
+              <sc-if value="{{ installCopied }}" hint-placeholder-val="{{ false }}"><span data-l="zh">已复制</span><span data-l="en">Copied</span></sc-if>
+              <sc-if value="{{ installNotCopied }}" hint-placeholder-val="{{ true }}"><span data-l="zh">复制</span><span data-l="en">Copy</span></sc-if>
+            </button>
+          </div>
+          <button onClick="{{ goCatalog }}" style="display: flex; align-items: center; gap: 9px; background: var(--ac); color: #fff; border: none; padding: 12px 22px; border-radius: 3px; font-size: 14px; font-weight: 500; cursor: pointer;" style-hover="background: #3D45E8">
+            <span data-l="zh">逛插件目录</span><span data-l="en">Browse the catalog</span><span style="font-family: 'IBM Plex Mono', monospace;">→</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div style="border-bottom: 1px solid var(--line); background: var(--bg2);">
+      <div style="max-width: 1400px; margin: 0 auto; padding: 0 clamp(16px, 3vw, 40px); display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
+        <div style="padding: 22px 0; border-right: 1px solid var(--line);">
+          <div style="font-family: 'IBM Plex Mono', monospace; font-size: 30px; font-weight: 500; letter-spacing: -0.03em; line-height: 1;">{{ total }}</div>
+          <div style="font-size: 12.5px; color: var(--fg3); margin-top: 7px;"><span data-l="zh">名单收录插件</span><span data-l="en">Curated plugins</span></div>
+        </div>
+        <div style="padding: 22px 0 22px clamp(16px, 2vw, 28px); border-right: 1px solid var(--line);">
+          <div style="font-family: 'IBM Plex Mono', monospace; font-size: 30px; font-weight: 500; letter-spacing: -0.03em; line-height: 1; color: var(--ac2);">{{ topicCount }}</div>
+          <div style="font-size: 12.5px; color: var(--fg3); margin-top: 7px;"><span data-l="zh">话题实时命中</span><span data-l="en">Live topic hits</span></div>
+        </div>
+        <div style="padding: 22px 0 22px clamp(16px, 2vw, 28px); border-right: 1px solid var(--line);">
+          <div style="font-family: 'IBM Plex Mono', monospace; font-size: 30px; font-weight: 500; letter-spacing: -0.03em; line-height: 1;">{{ ownerCount }}</div>
+          <div style="font-size: 12.5px; color: var(--fg3); margin-top: 7px;"><span data-l="zh">作者与组织</span><span data-l="en">Authors & orgs</span></div>
+        </div>
+        <div style="padding: 22px 0 22px clamp(16px, 2vw, 28px);">
+          <div style="font-family: 'IBM Plex Mono', monospace; font-size: 30px; font-weight: 500; letter-spacing: -0.03em; line-height: 1;">{{ starTotal }}</div>
+          <div style="font-size: 12.5px; color: var(--fg3); margin-top: 7px;"><span data-l="zh">合计星标 · {{ matchNoteZh }}</span><span data-l="en">Total stars · {{ matchNoteEn }}</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="max-width: 1400px; margin: 0 auto; padding: clamp(44px, 5vw, 68px) clamp(16px, 3vw, 40px) 0;">
+      <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 20px; flex-wrap: wrap; margin-bottom: 22px;">
+        <h2 style="margin: 0; font-size: 26px; font-weight: 600; letter-spacing: -0.02em;"><span data-l="zh">大家在装什么</span><span data-l="en">What people are installing</span></h2>
+        <button onClick="{{ goRank }}" style="background: none; border: none; color: var(--ac2); font-size: 13.5px; cursor: pointer; padding: 0;" style-hover="color: var(--fg)"><span data-l="zh">看完整排行榜 →</span><span data-l="en">Full leaderboard →</span></button>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(268px, 1fr)); gap: 14px;">
+        <sc-for list="{{ featured }}" as="p" hint-placeholder-count="6">
+          <div onClick="{{ p.open }}" style="border: 1px solid var(--line); background: var(--bg2); border-radius: 4px; padding: 17px 18px 15px; cursor: pointer; display: flex; flex-direction: column; gap: 9px;" style-hover="border-color: var(--ac); transform: translateY(-2px)">
+            <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;">
+              <span style="font-family: 'IBM Plex Mono', monospace; font-size: 14px; font-weight: 500; overflow-wrap: anywhere;">{{ p.name }}</span>
+              <span style="display: flex; align-items: center; gap: 4px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--star); white-space: nowrap;">★ {{ p.stars }}</span>
+            </div>
+            <span style="font-size: 12.5px; color: var(--fg3);">{{ p.owner }}</span>
+            <span style="font-size: 13px; color: var(--fg2); line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;"><span data-l="zh">{{ p.zh }}</span><span data-l="en">{{ p.en }}</span></span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="max-width: 1400px; margin: 0 auto; padding: clamp(44px, 5vw, 68px) clamp(16px, 3vw, 40px) 0;">
+      <h2 style="margin: 0 0 22px; font-size: 26px; font-weight: 600; letter-spacing: -0.02em;"><span data-l="zh">按分类逛</span><span data-l="en">Browse by category</span></h2>
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(196px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line);">
+        <sc-for list="{{ catTiles }}" as="c" hint-placeholder-count="7">
+          <button onClick="{{ c.go }}" style="background: var(--bg2); border: none; text-align: left; padding: 20px 18px 22px; cursor: pointer; display: flex; flex-direction: column; gap: 7px;" style-hover="background: var(--bg3)">
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 22px; font-weight: 500; color: var(--ac2); line-height: 1;">{{ c.count }}</span>
+            <span style="font-size: 14px; font-weight: 500;"><span data-l="zh">{{ c.zh }}</span><span data-l="en">{{ c.en }}</span></span>
+            <span style="font-size: 11.5px; color: var(--fg3); line-height: 1.5;"><span data-l="zh">{{ c.hintZh }}</span><span data-l="en">{{ c.hintEn }}</span></span>
+          </button>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="max-width: 1400px; margin: 0 auto; padding: clamp(44px, 5vw, 68px) clamp(16px, 3vw, 40px) clamp(52px, 6vw, 80px);">
+      <div style="border: 1px solid var(--line); background: var(--bg2); display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));">
+        <div style="padding: 24px 22px; border-right: 1px solid var(--line);">
+          <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.14em; color: var(--ac); text-transform: uppercase; margin-bottom: 14px;">Where it comes from</div>
+          <h3 style="margin: 0 0 10px; font-size: 18px; font-weight: 600;"><span data-l="zh">来源机制</span><span data-l="en">How listings get here</span></h3>
+          <p style="margin: 0; font-size: 13px; color: var(--fg2); line-height: 1.65;"><span data-l="zh">两条来路，卡片角标会标出来。本站不托管代码，也不代为审核。</span><span data-l="en">Two paths in, marked on every card. We host no code and vet nothing.</span></p>
+        </div>
+        <div style="padding: 24px 22px; border-right: 1px solid var(--line);">
+          <div style="display: inline-flex; align-items: center; gap: 5px; font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; letter-spacing: 0.06em; color: var(--ac2); border: 1px solid var(--ac); padding: 2px 7px; margin-bottom: 13px;">TOPIC</div>
+          <h4 style="margin: 0 0 8px; font-size: 14.5px; font-weight: 600;"><span data-l="zh">话题自动收录</span><span data-l="en">Auto-indexed by topic</span></h4>
+          <p style="margin: 0 0 10px; font-size: 12.5px; color: var(--fg2); line-height: 1.65;"><span data-l="zh">作者给仓库打上 dsh-plugin 话题，本站扫一遍话题拿到星标与更新时间，结果在你的浏览器里缓存 45 分钟。本次数据取自 {{ ageZh }}。</span><span data-l="en">Authors tag the repo with dsh-plugin; we scan the topic for stars and push times and cache the result in your browser for 45 minutes. Current data is from {{ ageEn }}.</span></p>
+          <a href="https://github.com/topics/dsh-plugin" target="_blank" rel="noreferrer" style="font-family: 'IBM Plex Mono', monospace; font-size: 11.5px;">topics/dsh-plugin ↗</a>
+        </div>
+        <div style="padding: 24px 22px;">
+          <div style="display: inline-flex; align-items: center; gap: 5px; font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; letter-spacing: 0.06em; color: var(--fg3); border: 1px solid var(--line2); padding: 2px 7px; margin-bottom: 13px;">LIST</div>
+          <h4 style="margin: 0 0 8px; font-size: 14.5px; font-weight: 600;"><span data-l="zh">名单人工精选</span><span data-l="en">Hand-picked list</span></h4>
+          <p style="margin: 0 0 10px; font-size: 12.5px; color: var(--fg2); line-height: 1.65;"><span data-l="zh">社区精选名单里被 PR 收录、有人写了一句中文描述的条目。中文描述译自那份名单。</span><span data-l="en">Entries merged into the community list via PR, each with a one-line description. Chinese copy is translated from it.</span></p>
+          <a href="https://github.com/awesome-dsh-plugin/awesome-dsh-plugin" target="_blank" rel="noreferrer" style="font-family: 'IBM Plex Mono', monospace; font-size: 11.5px;">awesome-dsh-plugin ↗</a>
+        </div>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isCatalog }}" hint-placeholder-val="{{ false }}">
+  <div data-screen-label="插件目录" style="max-width: 1400px; margin: 0 auto; padding: clamp(30px, 4vw, 48px) clamp(16px, 3vw, 40px) 60px;">
+    <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; flex-wrap: wrap; margin-bottom: 22px;">
+      <div>
+        <h2 style="margin: 0 0 6px; font-size: clamp(26px, 3.4vw, 34px); font-weight: 600; letter-spacing: -0.025em;"><span data-l="zh">插件目录</span><span data-l="en">Catalog</span></h2>
+        <div style="font-size: 13px; color: var(--fg3);"><span data-l="zh">{{ shown }} 个结果</span><span data-l="en">{{ shown }} results</span></div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 8px; background: var(--bg2); border: 1px solid var(--line2); padding: 0 12px; height: 38px; border-radius: 3px; width: clamp(200px, 30vw, 300px);">
+          <span style="font-family: 'IBM Plex Mono', monospace; color: var(--fg3); font-size: 13px;">/</span>
+          <input type="text" value="{{ query }}" onInput="{{ onSearch }}" placeholder="{{ searchPlaceholder }}" style="flex: 1; background: none; border: none; outline: none; font-size: 13.5px; min-width: 0;" />
+          <sc-if value="{{ hasQuery }}" hint-placeholder-val="{{ false }}">
+            <button onClick="{{ clearQuery }}" style="background: none; border: none; color: var(--fg3); cursor: pointer; font-size: 15px; line-height: 1; padding: 0;" style-hover="color: var(--fg)">×</button>
+          </sc-if>
+        </div>
+        <select value="{{ sort }}" onChange="{{ onSort }}" style="height: 38px; background: var(--bg2); border: 1px solid var(--line2); border-radius: 3px; padding: 0 10px; font-size: 13px; outline: none; cursor: pointer;">
+          <sc-for list="{{ sortOptions }}" as="o" hint-placeholder-count="4">
+            <option value="{{ o.id }}">{{ o.label }}</option>
+          </sc-for>
+        </select>
+        <div style="display: flex; border: 1px solid var(--line2); border-radius: 3px; overflow: hidden; height: 38px;">
+          <button onClick="{{ setList }}" title="列表" style="background: {{ listBg }}; color: {{ listFg }}; border: none; width: 38px; cursor: pointer; font-size: 13px;">☰</button>
+          <button onClick="{{ setCards }}" title="卡片" style="background: {{ cardBg }}; color: {{ cardFg }}; border: none; border-left: 1px solid var(--line2); width: 38px; cursor: pointer; font-size: 13px;">▦</button>
+        </div>
+      </div>
+    </div>
+
+    <div style="display: flex; gap: 6px; flex-wrap: wrap; padding-bottom: 18px; border-bottom: 1px solid var(--line); margin-bottom: 6px;">
+      <sc-for list="{{ cats }}" as="c" hint-placeholder-count="8">
+        <button onClick="{{ c.select }}" style="background: {{ c.bg }}; color: {{ c.fg }}; border: 1px solid {{ c.bd }}; border-radius: 20px; padding: 6px 14px; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 7px;" style-hover="border-color: var(--ac)">
+          <span data-l="zh">{{ c.zh }}</span><span data-l="en">{{ c.en }}</span>
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; opacity: 0.6;">{{ c.count }}</span>
+        </button>
+      </sc-for>
+      <sc-if value="{{ favOnly }}" hint-placeholder-val="{{ false }}">
+        <button onClick="{{ toggleFavOnly }}" style="background: var(--ac); color: #fff; border: 1px solid var(--ac); border-radius: 20px; padding: 6px 14px; font-size: 13px; cursor: pointer;">★ <span data-l="zh">只看收藏 ×</span><span data-l="en">Favorites only ×</span></button>
+      </sc-if>
+    </div>
+
+    <sc-if value="{{ isList }}" hint-placeholder-val="{{ true }}">
+      <div>
+        <sc-for list="{{ rows }}" as="p" hint-placeholder-count="12">
+          <div onClick="{{ p.open }}" style="position: relative; display: grid; grid-template-columns: 34px minmax(130px, 240px) minmax(190px, 1fr) auto; gap: clamp(10px, 1.4vw, 20px); align-items: baseline; padding: 14px 12px 14px 8px; border-bottom: 1px solid var(--line); cursor: pointer;" style-hover="background: var(--bg2)">
+            <sc-if value="{{ p.on }}" hint-placeholder-val="{{ false }}">
+              <span style="position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: var(--ac);"></span>
+            </sc-if>
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; color: var(--fg3);">{{ p.no }}</span>
+            <span style="display: block; min-width: 0;">
+              <span style="display: flex; align-items: center; gap: 7px; flex-wrap: wrap;">
+                <span style="font-family: 'IBM Plex Mono', monospace; font-size: 14px; font-weight: 500; overflow-wrap: anywhere;">{{ p.name }}</span>
+                <span style="font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.06em; color: {{ p.srcFg }}; border: 1px solid {{ p.srcBd }}; padding: 1px 5px; white-space: nowrap;">{{ p.srcTag }}</span>
+              </span>
+              <span style="display: block; font-size: 11.5px; color: var(--fg3); margin-top: 4px;">{{ p.owner }}</span>
+            </span>
+            <span style="display: block; min-width: 0; font-size: 13px; color: var(--fg2); line-height: 1.6;"><span data-l="zh">{{ p.zh }}</span><span data-l="en">{{ p.en }}</span></span>
+            <span style="display: flex; align-items: center; justify-content: flex-end; gap: 8px;">
+              <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: {{ p.starFg }}; white-space: nowrap; min-width: 46px; text-align: right;">{{ p.starLabel }}</span>
+              <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--fg3); white-space: nowrap; min-width: 54px; text-align: right;">{{ p.updated }}</span>
+              <button onClick="{{ p.toggleFav }}" title="收藏" style="background: none; border: 1px solid var(--line2); color: {{ p.favFg }}; border-radius: 2px; width: 26px; height: 26px; cursor: pointer; font-size: 12px; line-height: 1;" style-hover="border-color: var(--ac)">★</button>
+              <button onClick="{{ p.copy }}" style="background: none; border: 1px solid var(--line2); color: var(--fg2); font-size: 11px; padding: 5px 9px; border-radius: 2px; cursor: pointer; white-space: nowrap;" style-hover="border-color: var(--ac); color: #fff; background: var(--ac)">
+                <sc-if value="{{ p.copied }}" hint-placeholder-val="{{ false }}"><span data-l="zh">已复制</span><span data-l="en">Copied</span></sc-if>
+                <sc-if value="{{ p.notCopied }}" hint-placeholder-val="{{ true }}"><span data-l="zh">安装</span><span data-l="en">Install</span></sc-if>
+              </button>
+            </span>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isCards }}" hint-placeholder-val="{{ false }}">
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; padding-top: 18px;">
+        <sc-for list="{{ rows }}" as="p" hint-placeholder-count="9">
+          <div onClick="{{ p.open }}" style="position: relative; border: 1px solid {{ p.cardBd }}; background: var(--bg2); border-radius: 4px; padding: 16px 17px 14px; cursor: pointer; display: flex; flex-direction: column; gap: 9px;" style-hover="border-color: var(--ac); transform: translateY(-2px)">
+            <span style="position: absolute; top: 12px; right: 13px; font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.06em; color: {{ p.srcFg }}; border: 1px solid {{ p.srcBd }}; padding: 1px 5px;">{{ p.srcTag }}</span>
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 14.5px; font-weight: 500; overflow-wrap: anywhere; padding-right: 70px;">{{ p.name }}</span>
+            <span style="font-size: 12px; color: var(--fg3);">{{ p.owner }} · <span data-l="zh">{{ p.catZh }}</span><span data-l="en">{{ p.catEn }}</span></span>
+            <span style="font-size: 13px; color: var(--fg2); line-height: 1.6; flex: 1; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;"><span data-l="zh">{{ p.zh }}</span><span data-l="en">{{ p.en }}</span></span>
+            <span style="display: flex; align-items: center; gap: 10px; padding-top: 9px; border-top: 1px solid var(--line);">
+              <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: {{ p.starFg }};">{{ p.starLabel }}</span>
+              <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--fg3);">{{ p.updated }}</span>
+              <span style="flex: 1;"></span>
+              <button onClick="{{ p.toggleFav }}" style="background: none; border: 1px solid var(--line2); color: {{ p.favFg }}; border-radius: 2px; width: 26px; height: 26px; cursor: pointer; font-size: 12px; line-height: 1;" style-hover="border-color: var(--ac)">★</button>
+              <button onClick="{{ p.copy }}" style="background: none; border: 1px solid var(--line2); color: var(--fg2); font-size: 11px; padding: 5px 9px; border-radius: 2px; cursor: pointer; white-space: nowrap;" style-hover="border-color: var(--ac); color: #fff; background: var(--ac)">
+                <sc-if value="{{ p.copied }}" hint-placeholder-val="{{ false }}"><span data-l="zh">已复制</span><span data-l="en">Copied</span></sc-if>
+                <sc-if value="{{ p.notCopied }}" hint-placeholder-val="{{ true }}"><span data-l="zh">安装</span><span data-l="en">Install</span></sc-if>
+              </button>
+            </span>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ empty }}" hint-placeholder-val="{{ false }}">
+      <div style="padding: 70px 20px; text-align: center; color: var(--fg3); font-size: 14px;">
+        <span data-l="zh">没有匹配的插件。</span><span data-l="en">Nothing matched.</span>
+        <button onClick="{{ resetAll }}" style="background: none; border: none; color: var(--ac2); cursor: pointer; text-decoration: underline; padding: 0;"><span data-l="zh">清空筛选</span><span data-l="en">Clear filters</span></button>
+      </div>
+    </sc-if>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isRank }}" hint-placeholder-val="{{ false }}">
+  <div data-screen-label="排行榜" style="max-width: 1400px; margin: 0 auto; padding: clamp(30px, 4vw, 48px) clamp(16px, 3vw, 40px) 70px;">
+    <h2 style="margin: 0 0 6px; font-size: clamp(26px, 3.4vw, 34px); font-weight: 600; letter-spacing: -0.025em;"><span data-l="zh">排行榜</span><span data-l="en">Leaderboard</span></h2>
+    <p style="margin: 0 0 30px; font-size: 13.5px; color: var(--fg3);">{{ liveNote }}</p>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: clamp(20px, 3vw, 44px);">
+      <div>
+        <div style="display: flex; align-items: baseline; gap: 10px; padding-bottom: 12px; border-bottom: 1px solid var(--line2);">
+          <h3 style="margin: 0; font-size: 17px; font-weight: 600;"><span data-l="zh">星标榜</span><span data-l="en">Most starred</span></h3>
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--fg3);">TOP 20</span>
+        </div>
+        <sc-for list="{{ topStars }}" as="p" hint-placeholder-count="10">
+          <div onClick="{{ p.open }}" style="display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 11px 6px; border-bottom: 1px solid var(--line); cursor: pointer;" style-hover="background: var(--bg2)">
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: {{ p.rankFg }};">{{ p.rank }}</span>
+            <span style="min-width: 0;">
+              <span style="display: block; font-family: 'IBM Plex Mono', monospace; font-size: 13.5px; overflow-wrap: anywhere;">{{ p.name }}</span>
+              <span style="display: block; font-size: 11.5px; color: var(--fg3); margin-top: 2px;">{{ p.owner }}</span>
+            </span>
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--star); white-space: nowrap;">★ {{ p.stars }}</span>
+          </div>
+        </sc-for>
+      </div>
+      <div>
+        <div style="display: flex; align-items: baseline; gap: 10px; padding-bottom: 12px; border-bottom: 1px solid var(--line2);">
+          <h3 style="margin: 0; font-size: 17px; font-weight: 600;"><span data-l="zh">最近有动静</span><span data-l="en">Recently active</span></h3>
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--fg3);">BY PUSH</span>
+        </div>
+        <sc-for list="{{ topFresh }}" as="p" hint-placeholder-count="10">
+          <div onClick="{{ p.open }}" style="display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 11px 6px; border-bottom: 1px solid var(--line); cursor: pointer;" style-hover="background: var(--bg2)">
+            <span style="min-width: 0;">
+              <span style="display: block; font-family: 'IBM Plex Mono', monospace; font-size: 13.5px; overflow-wrap: anywhere;">{{ p.name }}</span>
+              <span style="display: block; font-size: 11.5px; color: var(--fg3); margin-top: 2px;">{{ p.owner }}</span>
+            </span>
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--ok); white-space: nowrap;">{{ p.updated }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isSubmit }}" hint-placeholder-val="{{ false }}">
+  <div data-screen-label="收录说明" style="max-width: 1400px; margin: 0 auto; padding: clamp(30px, 4vw, 48px) clamp(16px, 3vw, 40px) 70px;">
+    <h2 style="margin: 0 0 12px; font-size: clamp(26px, 3.4vw, 34px); font-weight: 600; letter-spacing: -0.025em;"><span data-l="zh">让你的插件出现在这里</span><span data-l="en">Get your plugin listed</span></h2>
+    <p style="margin: 0 0 34px; max-width: 640px; font-size: 15px; color: var(--fg2);"><span data-l="zh">不用向本站申请。走完公开链路就会自己出现 —— 第一步就够上榜，第二步让它有中文描述。</span><span data-l="en">No application needed. Walk the public path and you show up — step one is enough to appear, step two gets you a description.</span></p>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: clamp(20px, 3vw, 40px); align-items: start;">
+      <div style="display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line);">
+        <div style="background: var(--bg2); padding: 20px 22px; display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 14px; align-items: baseline;">
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; color: var(--ac);">01</span>
+          <span><span style="display: block; font-size: 14.5px; font-weight: 600; margin-bottom: 5px;"><span data-l="zh">打上话题</span><span data-l="en">Tag the repo</span></span><span style="display: block; font-size: 13px; color: var(--fg2); line-height: 1.65;"><span data-l="zh">在仓库设置里加上 dsh-plugin 话题，写清描述与许可。下次打开本站就能查到你。</span><span data-l="en">Add the dsh-plugin topic with a clear description and license. The next page load will find you.</span></span></span>
+        </div>
+        <div style="background: var(--bg2); padding: 20px 22px; display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 14px; align-items: baseline;">
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; color: var(--ac);">02</span>
+          <span><span style="display: block; font-size: 14.5px; font-weight: 600; margin-bottom: 5px;"><span data-l="zh">提一个 PR</span><span data-l="en">Open a PR</span></span><span style="display: block; font-size: 13px; color: var(--fg2); line-height: 1.65;"><span data-l="zh">在社区精选名单里，中英两份 README 各加一行：名称、链接、一句话描述。</span><span data-l="en">Add one line to both READMEs in the community list: name, link, one-line description.</span></span></span>
+        </div>
+        <div style="background: var(--bg2); padding: 20px 22px; display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 14px; align-items: baseline;">
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; color: var(--ac);">03</span>
+          <span><span style="display: block; font-size: 14.5px; font-weight: 600; margin-bottom: 5px;"><span data-l="zh">挂上徽章</span><span data-l="en">Show the badge</span></span><span style="display: block; font-size: 13px; color: var(--fg2); line-height: 1.65;"><span data-l="zh">合并之后，把徽章放进你自己的 README。</span><span data-l="en">Once merged, drop the badge into your own README.</span></span></span>
+        </div>
+      </div>
+      <div>
+        <div style="border: 1px solid var(--line); background: var(--bg2); padding: 22px;">
+          <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.14em; color: var(--fg3); text-transform: uppercase; margin-bottom: 16px;">Upstream</div>
+          <div style="display: grid; gap: 13px; font-size: 13px;">
+            <a href="https://github.com/deepseek-ai/deepseek-harness" target="_blank" rel="noreferrer" style="display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--line); padding-bottom: 12px; color: var(--fg);" style-hover="color: var(--ac2)"><span style="font-family: 'IBM Plex Mono', monospace;">deepseek-ai/deepseek-harness</span><span style="color: var(--fg3);">↗</span></a>
+            <a href="https://github.com/topics/dsh-plugin" target="_blank" rel="noreferrer" style="display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--line); padding-bottom: 12px; color: var(--fg);" style-hover="color: var(--ac2)"><span style="font-family: 'IBM Plex Mono', monospace;">topics/dsh-plugin</span><span style="color: var(--fg3);">↗</span></a>
+            <a href="https://github.com/awesome-dsh-plugin/awesome-dsh-plugin" target="_blank" rel="noreferrer" style="display: flex; justify-content: space-between; gap: 12px; color: var(--fg);" style-hover="color: var(--ac2)"><span style="font-family: 'IBM Plex Mono', monospace;">awesome-dsh-plugin · CC0</span><span style="color: var(--fg3);">↗</span></a>
+          </div>
+        </div>
+        <div style="border: 1px solid var(--line); border-top: none; background: var(--bg3); padding: 16px 22px; display: flex; align-items: center; gap: 12px;">
+          <span style="flex: 1; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--fg2); overflow-wrap: anywhere; line-height: 1.6;">[![Awesome DSH Plugin](https://awesome-dsh-plugin.com/badge.svg)](https://awesome-dsh-plugin.com)</span>
+          <button onClick="{{ copyBadge }}" style="background: none; border: 1px solid var(--line2); color: var(--fg2); font-size: 11.5px; padding: 6px 10px; border-radius: 2px; cursor: pointer; white-space: nowrap;" style-hover="border-color: var(--ac); background: var(--ac); color: #fff">
+            <sc-if value="{{ badgeCopied }}" hint-placeholder-val="{{ false }}"><span data-l="zh">已复制</span><span data-l="en">Copied</span></sc-if>
+            <sc-if value="{{ badgeNotCopied }}" hint-placeholder-val="{{ true }}"><span data-l="zh">复制</span><span data-l="en">Copy</span></sc-if>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isGuide }}" hint-placeholder-val="{{ false }}">
+  <div data-screen-label="开发指南" style="max-width: 1400px; margin: 0 auto; padding: clamp(30px, 4vw, 48px) clamp(16px, 3vw, 40px) 70px;">
+    <h2 style="margin: 0 0 12px; font-size: clamp(26px, 3.4vw, 34px); font-weight: 600; letter-spacing: -0.025em;"><span data-l="zh">写一个 dsh 插件</span><span data-l="en">Write a dsh plugin</span></h2>
+    <p style="margin: 0 0 16px; max-width: 660px; font-size: 15px; color: var(--fg2);"><span data-l="zh">dsh 的插件系统建立在 Cordis 之上：一个插件就是一个拿到上下文、往里注册能力、卸载时收回的模块。下面是社区常走的路子。</span><span data-l="en">The dsh plugin system is built on Cordis: a plugin is a module that takes a context, registers capabilities into it, and cleans up on unload. Here's the path the community takes.</span></p>
+    <div style="display: flex; gap: 14px; align-items: flex-start; border-left: 2px solid var(--ac); background: var(--bg2); padding: 14px 18px; margin-bottom: 34px; max-width: 660px;">
+      <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--ac2); letter-spacing: 0.1em; padding-top: 3px;">NOTE</span>
+      <p style="margin: 0; font-size: 13px; color: var(--fg2); line-height: 1.65;"><span data-l="zh">dsh 处于开发者预览，官方明确会有破坏性变更。具体 API 以官方开发文档为准，本页只给路线。</span><span data-l="en">dsh is in developer preview and breaking changes are expected. Follow the official dev docs for exact APIs — this page is only the route.</span></p>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(258px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line);">
+      <sc-for list="{{ guideSteps }}" as="s" hint-placeholder-count="5">
+        <div style="background: var(--bg2); padding: 24px 22px 26px; display: flex; flex-direction: column; gap: 10px;">
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; color: var(--ac); letter-spacing: 0.1em;">{{ s.no }}</span>
+          <span style="font-size: 15.5px; font-weight: 600;"><span data-l="zh">{{ s.zh }}</span><span data-l="en">{{ s.en }}</span></span>
+          <span style="font-size: 13px; color: var(--fg2); line-height: 1.65;"><span data-l="zh">{{ s.bodyZh }}</span><span data-l="en">{{ s.bodyEn }}</span></span>
+          <sc-if value="{{ s.hasLink }}" hint-placeholder-val="{{ false }}">
+            <a href="{{ s.url }}" target="_blank" rel="noreferrer" style="font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; margin-top: auto;">{{ s.linkLabel }} ↗</a>
+          </sc-if>
+        </div>
+      </sc-for>
+    </div>
+    <div style="margin-top: 34px; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: clamp(18px, 3vw, 36px);">
+      <div>
+        <h3 style="margin: 0 0 14px; font-size: 17px; font-weight: 600;"><span data-l="zh">值得先读的几个仓库</span><span data-l="en">Repos worth reading first</span></h3>
+        <sc-for list="{{ guideRepos }}" as="r" hint-placeholder-count="4">
+          <a href="{{ r.url }}" target="_blank" rel="noreferrer" style="display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: baseline; padding: 12px 4px; border-bottom: 1px solid var(--line); color: var(--fg);" style-hover="color: var(--ac2)">
+            <span style="min-width: 0;">
+              <span style="display: block; font-family: 'IBM Plex Mono', monospace; font-size: 13.5px; overflow-wrap: anywhere;">{{ r.name }}</span>
+              <span style="display: block; font-size: 12px; color: var(--fg3); margin-top: 3px; line-height: 1.55;"><span data-l="zh">{{ r.zh }}</span><span data-l="en">{{ r.en }}</span></span>
+            </span>
+            <span style="color: var(--fg3); font-size: 12px;">↗</span>
+          </a>
+        </sc-for>
+      </div>
+      <div>
+        <h3 style="margin: 0 0 14px; font-size: 17px; font-weight: 600;"><span data-l="zh">发布前自查</span><span data-l="en">Before you publish</span></h3>
+        <sc-for list="{{ checklist }}" as="c" hint-placeholder-count="5">
+          <div style="display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 12px; align-items: baseline; padding: 11px 4px; border-bottom: 1px solid var(--line);">
+            <span style="color: var(--ok); font-size: 13px;">✓</span>
+            <span style="font-size: 13px; color: var(--fg2); line-height: 1.6;"><span data-l="zh">{{ c.zh }}</span><span data-l="en">{{ c.en }}</span></span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <div style="border-top: 1px solid var(--line); background: var(--bg2);">
+    <div style="max-width: 1400px; margin: 0 auto; padding: 22px clamp(16px, 3vw, 40px); display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; color: var(--fg3);">
+      <span>DSH PLUGIN HUB · {{ total }} <span data-l="zh">条名单</span><span data-l="en">listed</span> · {{ syncLabel }}</span>
+      <span><span data-l="zh">社区索引，与 DeepSeek AI 无隶属关系</span><span data-l="en">Community index, not affiliated with DeepSeek AI</span></span>
+    </div>
+  </div>
+
+  <sc-if value="{{ sel }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ close }}" style="position: fixed; inset: 0; z-index: 50; background: rgba(6,7,9,0.6);"></div>
+  </sc-if>
+  <sc-if value="{{ sel }}" hint-placeholder-val="{{ false }}">
+    <div style="position: fixed; top: 0; right: 0; bottom: 0; z-index: 51; width: 470px; max-width: 94vw; background: var(--bg); border-left: 1px solid var(--line2); overflow-y: auto; animation: slideIn 0.28s cubic-bezier(0.2,0.7,0.2,1) both;">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 24px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--bg); z-index: 2;">
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; letter-spacing: 0.12em; color: {{ sel.srcFg }}; border: 1px solid {{ sel.srcBd }}; padding: 2px 7px;">{{ sel.srcTag }}</span>
+        <button onClick="{{ close }}" style="background: none; border: 1px solid var(--line2); color: var(--fg2); width: 28px; height: 28px; border-radius: 2px; cursor: pointer; font-size: 15px; line-height: 1;" style-hover="border-color: var(--ac); color: var(--fg)">×</button>
+      </div>
+      <div style="padding: 26px 24px 40px;">
+        <h3 style="margin: 0 0 7px; font-family: 'IBM Plex Mono', monospace; font-size: 24px; font-weight: 500; letter-spacing: -0.025em; line-height: 1.16; overflow-wrap: anywhere;">{{ sel.name }}</h3>
+        <div style="font-size: 13px; color: var(--fg3); margin-bottom: 18px;">{{ sel.owner }} · <span data-l="zh">{{ sel.catZh }}</span><span data-l="en">{{ sel.catEn }}</span></div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 22px;">
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--star); border: 1px solid var(--line2); padding: 4px 10px; border-radius: 2px;">{{ sel.starLabel }}</span>
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--fg2); border: 1px solid var(--line2); padding: 4px 10px; border-radius: 2px;">{{ sel.updatedFull }}</span>
+          <sc-if value="{{ sel.hasLicense }}" hint-placeholder-val="{{ false }}">
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--fg2); border: 1px solid var(--line2); padding: 4px 10px; border-radius: 2px;">{{ sel.license }}</span>
+          </sc-if>
+        </div>
+        <p style="margin: 0 0 26px; font-size: 15px; color: var(--fg); line-height: 1.7;"><span data-l="zh">{{ sel.zh }}</span><span data-l="en">{{ sel.en }}</span></p>
+
+        <div style="font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; letter-spacing: 0.14em; color: var(--fg3); text-transform: uppercase; padding-bottom: 10px; border-bottom: 1px solid var(--line);"><span data-l="zh">安装</span><span data-l="en">Install</span></div>
+        <p style="margin: 12px 0 10px; font-size: 12.5px; color: var(--fg2); line-height: 1.65;"><span data-l="zh">在 dsh Web UI 的插件管理里添加下面这个仓库，或按该仓库 README 的说明操作。</span><span data-l="en">Add the repository below in the dsh Web UI plugin manager, or follow that repo's README.</span></p>
+        <div style="display: flex; align-items: center; background: var(--bg2); border: 1px solid var(--line2); border-radius: 3px; margin-bottom: 10px;">
+          <span style="flex: 1; font-family: 'IBM Plex Mono', monospace; font-size: 12px; padding: 11px 12px; color: var(--fg); overflow-wrap: anywhere;">{{ sel.repo }}</span>
+          <button onClick="{{ copySel }}" style="border: none; border-left: 1px solid var(--line2); background: var(--bg3); color: var(--fg2); font-size: 12px; padding: 11px 13px; cursor: pointer; align-self: stretch; white-space: nowrap;" style-hover="background: var(--ac); color: #fff">
+            <sc-if value="{{ sel.copied }}" hint-placeholder-val="{{ false }}"><span data-l="zh">已复制</span><span data-l="en">Copied</span></sc-if>
+            <sc-if value="{{ sel.notCopied }}" hint-placeholder-val="{{ true }}"><span data-l="zh">复制</span><span data-l="en">Copy</span></sc-if>
+          </button>
+        </div>
+        <div style="display: flex; gap: 8px; margin-bottom: 28px;">
+          <a href="{{ sel.url }}" target="_blank" rel="noreferrer" style="flex: 1; text-align: center; background: var(--ac); color: #fff; padding: 11px; border-radius: 3px; font-size: 13.5px; font-weight: 500;" style-hover="background: #3D45E8"><span data-l="zh">在 GitHub 打开 ↗</span><span data-l="en">Open on GitHub ↗</span></a>
+          <button onClick="{{ favSel }}" style="background: none; border: 1px solid var(--line2); color: {{ sel.favFg }}; padding: 11px 16px; border-radius: 3px; font-size: 13.5px; cursor: pointer; white-space: nowrap;" style-hover="border-color: var(--ac)">★ <span data-l="zh">{{ sel.favLabelZh }}</span><span data-l="en">{{ sel.favLabelEn }}</span></button>
+        </div>
+
+        <div style="font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; letter-spacing: 0.14em; color: var(--fg3); text-transform: uppercase; padding-bottom: 10px; border-bottom: 1px solid var(--line);"><span data-l="zh">来源</span><span data-l="en">Source</span></div>
+        <div style="padding: 14px 0 0; font-size: 12.5px; color: var(--fg2); line-height: 1.7;">{{ sel.srcNote }}</div>
+        <p style="margin: 18px 0 0; font-size: 12px; color: var(--fg3); line-height: 1.7;"><span data-l="zh">插件在你的机器上以完整权限运行。安装前请自行阅读源码与许可 —— 收录不等于背书。</span><span data-l="en">Plugins run with full permissions on your machine. Read the source and license first — listing is not endorsement.</span></p>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1280,&quot;height&quot;:900},&quot;defaultLang&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;zh&quot;,&quot;en&quot;],&quot;default&quot;:&quot;zh&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;默认状态&quot;},&quot;defaultTheme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;dark&quot;,&quot;light&quot;],&quot;default&quot;:&quot;dark&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;默认状态&quot;},&quot;defaultView&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;list&quot;,&quot;cards&quot;],&quot;default&quot;:&quot;list&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;默认状态&quot;}}">
+const CATS = [
+  ["ui", "界面增强", "UI Enhancements", "侧栏、命令面板、diff 视图", "Panels, palettes, diff views"],
+  ["session", "会话与消息", "Sessions & Messages", "记忆、回退、分享、导入", "Memory, rewind, share, import"],
+  ["tools", "工具与能力", "Tools & Capabilities", "视觉、数据库、文档、工具箱", "Vision, DB, docs, toolkits"],
+  ["workflow", "工作流与自动化", "Workflow & Automation", "多代理编排、定时、监视", "Orchestration, cron, watches"],
+  ["notify", "通知与集成", "Notifications & Integrations", "桌面通知、IM 桥接、编辑器", "Desktop, IM bridges, editors"],
+  ["runtime", "开发与运行时", "Development & Runtime", "沙箱、遥测、预算、体检", "Sandboxes, telemetry, audits"],
+  ["fun", "趣味", "Just for Fun", "桌宠、小游戏、贴纸、恶搞", "Pets, minigames, stickers"]
+];
+
+const DATA = [
+  ["dsh-tianshu-tui","huiliyi37","ui","终端界面（TUI）版 DSH 客户端。","A terminal UI (TUI) for DeepSeek Harness."],
+  ["dsh-at-file","omdsh-dev","ui","Codex 式 @file 提及：在输入框搜索工作区文件，把内容附进提示。","Codex-style @file mentions: search workspace files in the composer and attach their contents to prompts."],
+  ["ui-status-label","alingalingling","ui","自定义「深度求索中」这类思考状态文案。","Customize the thinking status label to anything you like."],
+  ["dsh-openpencil","ZSeven-W","ui","OpenPencil 设计稿预览与编辑。","OpenPencil design preview and editing plugin."],
+  ["dsh-visualize","Nagi-ovo","ui","对话内生成式 UI：模型把交互式 HTML 卡片渲染进消息流，流式预览、沙箱隔离。","In-conversation generative UI: the model renders interactive HTML cards into the chat stream, with streaming preview and sandboxed rendering."],
+  ["dsh-side-panel","ccq1","ui","侧边栏集成文件浏览、终端与 Git 审阅，快速预览文件。","Side panel with file browser, terminal, and Git review for quick file previews."],
+  ["dsh-focus-chat","dingyi222666","ui","专注模式：只显示最终输出，隐藏中间过程。","A focus chat minimal view that shows only final outputs."],
+  ["dsh-genui","omdsh-dev","ui","回复内嵌交互组件：布局、图表、表单、测验、mermaid、3D 场景，并把交互事件回传模型。","Interactive UI components rendered inline in replies: layout, charts, forms, quizzes, mermaid, 3D scenes, and an action event loop back to the model."],
+  ["dsh-annotation","omdsh-dev","ui","选中文本即批注，随消息发送，回复逐条对应回批注。","Select text, annotate, send with your message; replies map back to each annotation."],
+  ["dsh-navbar","vlln","ui","会话节点导航条，在用户消息之间快速跳转。","Conversation node navigation bar for quick jumps between user messages."],
+  ["dsh-task-status","vlln","ui","后台任务状态条：进度加实时输出尾巴，常驻聊天页。","Background task status bar: progress plus live output tail on the chat page."],
+  ["dsh-web-archive","renat3u","ui","折叠 Think、Bash 等噪音消息。","Collapse noisy messages (Think, Bash, etc.) in conversations."],
+  ["dsh-spotlight","0xsline","ui","键盘优先的命令面板。","Keyboard-first command palette for the DSH Web UI."],
+  ["dsh-101","bill9109","ui","文档阅读模式。","Document reading mode for DSH."],
+  ["dsh-drag-and-drop","bill9109","ui","跨平台文件拖放，直接插入原始路径，不复制文件。","Cross-platform file drag-and-drop with raw path insertion, no file copying."],
+  ["dsh-deeplink","qyw233","ui","深链：用 ?session= / ?workspace= 直接打开指定会话或工作区。","Deep links: open a specific session or workspace via ?session= / ?workspace=."],
+  ["dsh-diff-viewer","lehhair","ui","PiUI 风格 diff 视图，替换写入与编辑工具的默认 DiffBlock。","PiUI-style diff viewer replacing the stock DiffBlock for write/edit tool calls."],
+  ["ex-setting","omdsh-dev","ui","设置项扩展。","Settings extensions for DSH."],
+  ["web-components","omdsh-dev","ui","Web Components 支持。","Web Components support."],
+  ["dsh-turn-navigator","vibeinging","ui","Web UI 的轮次导航。","Turn navigation for the DSH Web UI."],
+
+  ["dsh-turn-rewind","Anionex","session","回退对话与工作区状态，由持久化的 Change Ledger 驱动。","Rewind conversation and workspace state, powered by a persistent Change Ledger."],
+  ["distill","LoserFox","session","自动蒸馏对话：后台子代理反思，顺手创建或更新技能。","Automatic conversation distillation: background subagent reflection + skill create/update."],
+  ["dsh-share","hellodigua","session","一键分享对话。","Share your conversations with one click."],
+  ["dsh-message-edit","Moeblack","session","分支式消息编辑、重掷、重试与版本时间线。","Branch-based message editing, reroll, retry, and a version timeline."],
+  ["dsh-mnemon","omdsh-dev","session","Mnemon 深度集成：本地三层记忆 —— 运行时记忆、可检索文档、受监督记忆空间。","Deep Mnemon integration: local three-tier memory (Runtime Memory, retrievable Documents, supervised Memory Spaces)."],
+  ["nowledge-mem-deepseek-harness","nowledge-co","session","跨工具统一记忆层：上下文包注入、提示期召回、MCP 工具、轮次结束抓取线程。","One memory layer for every AI tool and agent: Context Bundle injection, prompt-time recall, MCP tools, and turn-end DSH thread capture."],
+  ["dsh-sidechain","Buyi-wsgzg","session","/side 持久侧会话与 /btw 一次性侧问，在临时分支里跑，不污染主历史。","/side persistent side sessions and /btw one-shot side questions, run in a temporary fork without touching main history."],
+  ["dsh-conversation-share","bill9109","session","分享对话中的任意片段。","Share any excerpt of a conversation."],
+  ["dsh-explain","yuezengwu","session","本地优先的学习模式：跨会话学习线程，逐来源讲解。","Local-first learning mode: cross-session learning threads with per-source explanations."],
+  ["dsh-prompt-studio","Moeblack","session","编辑用户提示与内置系统提示分段，实时预览。","Edit user and built-in system-prompt sections with live preview."],
+  ["dsh-chat-import","Nwflower","session","把 Claude Code / Codex / ChatGPT / Cursor 的历史导入为可续跑的会话。","Import Claude Code / Codex / ChatGPT / Cursor chat histories as resumable DeepSeek Harness sessions."],
+
+  ["dsh-vision-toolkit","Anionex","tools","给纯文本模型的视觉能力：意图感知图像问答、长截图 OCR、UI 复现、定位与像素级 diff。","Vision tasks for text-only models: intent-aware image Q&A, long-screenshot OCR, UI reproduction, grounding, and pixel diff."],
+  ["dsh-custom-tool","omdsh-dev","tools","用 Monaco 编辑器创建管理沙箱化 JavaScript 工具，生命周期交给模型驱动。","Create and manage sandboxed JavaScript tools with a Monaco editor and model-driven tool lifecycle."],
+  ["dsh-computer-use","Anionex","tools","无障碍接口优先的 macOS 计算机操作：新鲜观测、拒绝过期状态、权限收敛、安全输入。","Accessibility-first macOS computer use: fresh observations, stale-state rejection, scoped permissions, and safe input."],
+  ["dsh-data-agent","omdsh-dev","tools","让模型连接数据库并代写 SQL。","Let the AI connect to databases and write SQL for you."],
+  ["dsh-toolkit","omdsh-dev","tools","零依赖工具集：时间、编码、json、计算、csv、正则、markdown、diff、统计、schema，十个确定性工具一次装好。","Zero-dependency toolkit: time / encoding / json / calculator / csv / regex / markdown / diff / stat / schema — ten deterministic tools in one install."],
+  ["dsh-tool-csv","omdsh-dev","tools","解析、查询、聚合与转换 CSV（RFC 4180），零依赖状态机解析器。","Parse/query/aggregate/convert CSV (RFC 4180) with a zero-dependency state-machine parser."],
+  ["dsh-tool-calculator","omdsh-dev","tools","安全的数学表达式求值，零依赖递归下降解析。","Safe math expression evaluator, zero-dependency recursive-descent parser."],
+  ["dsh-tool-diff","omdsh-dev","tools","文本 / JSON / CSV / Markdown 的结构化比较与统一 diff。","Structured comparison and unified diffs for text/JSON/CSV/Markdown."],
+  ["dsh-tool-encoding","omdsh-dev","tools","base64 / url / hex 编码、常用哈希与 UUID 生成。","base64/url/hex encoding, common hashes, and UUID generation."],
+  ["dsh-tool-json","omdsh-dev","tools","以 JMESPath 子集查询 JSON。","JSON queries with a JMESPath subset."],
+  ["dsh-tool-markdown","omdsh-dev","tools","HTML ↔ Markdown 转换、GFM 表格规范化与目录生成。","HTML/Markdown conversion, GFM table normalization, and TOC generation."],
+  ["dsh-tool-regex","omdsh-dev","tools","测试、提取、安全替换与静态解释正则，不执行代码。","Test/extract/safe-replace/statically explain regexes without executing code."],
+  ["dsh-tool-schema","omdsh-dev","tools","JSON Schema 校验：validate / paths / explain / normalize。","JSON Schema validation: validate/paths/explain/normalize."],
+  ["dsh-tool-stat","omdsh-dev","tools","描述统计、分位数、频数分布与相关性。","Descriptive statistics, percentiles, frequency distributions, and correlation."],
+  ["dsh-tool-time","omdsh-dev","tools","严格 ISO 8601 解析、IANA 时区换算与 UTC 日历运算。","Strict ISO 8601 parsing, IANA timezone conversion, and UTC calendar arithmetic."],
+  ["dsh-kb-sieve","omdsh-dev","tools","从 md / txt / docx / pdf 构建可审计知识库包（SQLite FTS5），确定性检索并回读原文。","Build auditable KB packs (SQLite FTS5) from md/txt/docx/pdf with deterministic retrieval and original-text reading."],
+  ["dsh-plugin-mineru","HuanLinOTO","tools","把 MineRU 的文档解析能力暴露给模型。","Expose MineRU document parsing tools to the model."],
+  ["dsh-cowork","Jesse-njx","tools","有界、按单元格寻址的 doc_read / doc_write，覆盖 xlsx / pdf / docx / pptx / ipynb，附 MCP 服务与 CLI。","Bounded, cell-addressed doc_read/doc_write for xlsx / pdf / docx / pptx / ipynb, plus an MCP server and CLI."],
+  ["dsh-tool-search","vibeinging","tools","按代理按需发现工具，渐进披露 schema。","Per-agent on-demand tool discovery and progressive schema disclosure."],
+  ["dsh-openmaic","THU-MAIC","tools","OpenMAIC：课堂、讲稿、交互组件与苏格拉底式教学。","OpenMAIC: classrooms, slides, interactive widgets, and Socratic teaching."],
+  ["dsh-scholar","lzszq","tools","学术助手。","Academic assistant plugin."],
+
+  ["dsh_workflow","icetomoyo","workflow","UltraCode 式多代理编排：可生成、可保存、可治理、可观测、可续跑的工作流层。","UltraCode-style multi-agent orchestration: a generatable, savable, governable, observable, resumable workflow layer."],
+  ["dsh-agent-teams","NanmiCoder","workflow","AgentTeams 多代理团队。","AgentTeams multi-agent teams."],
+  ["dsh-automation","titanwings","workflow","在全新会话里定时跑编码任务，历史可审计。","Scheduled coding runs in fresh agent sessions with auditable history."],
+  ["dsh-plannotator","titanwings","workflow","计划审阅：锚定式批注与结构化反馈回传代理。","Plan review with anchored annotations and structured feedback back to the agent."],
+  ["dsh-loop","vlln","workflow","循环执行：/loop 命令、loop 工具与活动状态条。","Recurring loops: /loop command + loop tool + activity status bar."],
+  ["dsh-sentinel","fuhefei","workflow","条件驱动唤醒：文件 / 命令 / http / 进程 / webhook 的持久监视，条件满足即叫醒代理。","Condition-driven wakeup: durable file/command/http/process/webhook watches that wake the agent."],
+  ["dsh-deep-research","omdsh-dev","workflow","基于官方工作流引擎的自适应深度研究编排。","Adaptive deep-research orchestrator built on the official workflow engine."],
+  ["dsh-inspect","omdsh-dev","workflow","对抗式体检 → 修复 → 复核的闭环工具集。","Adversarial checkup, fix and review loop toolset."],
+  ["dsh-track","fakechris","workflow","内嵌任务管理引擎：决策点协议、灵感捕捉墙、Linear 式议题库。","Embedded task management engine: decision-point protocol, idea capture wall, Linear-style issue store."],
+  ["dsh-advisor","btspoony","workflow","配一个第二模型被动复核每一轮，并注入意见。","Pair a second model that passively reviews each turn and injects notes."],
+
+  ["dsh-open-in-vscode","omdsh-dev","notify","从 Web GUI 直接在 VS Code 里打开工作区目录。","Open DSH workspace directories in VS Code directly from the web GUI."],
+  ["dsh-notification","omdsh-dev","notify","轮次完成的桌面通知，按结果分级，支持关键词规则。","Desktop notifications for turn completions, with per-outcome controls and keyword rules."],
+  ["dsh-acp-for-bitfun","bobleer","notify","BitFun 与 DSH 之间的 ACP 桥。","ACP bridge between BitFun and DSH."],
+  ["telegram","LoserFox","notify","桥接 Telegram Bot API：长轮询、按会话隔离、HTML 格式化。","Bridge to the Telegram Bot API: long polling, per-chat sessions, HTML formatting."],
+  ["dsh-session-notification","dingyi222666","notify","四种会话状态的通知，支持浏览器提醒与追问。","Notifications for four session states, with browser alerts and prompts."],
+  ["dsh-web-ui-notify","bill9109","notify","桌面通知提醒。","Desktop notification reminders."],
+  ["dsh-webbridge","bill9109","notify","DSH 接入 Kimi WebBridge。","DSH meets Kimi WebBridge."],
+
+  ["fabric","omdsh-dev","runtime","MC-Fabric 式钩子处理器。","An MC-Fabric-style hook processor."],
+  ["dsh-git-identity","LoserFox","runtime","把 Git 提交钉在环境自身的作者身份上，环境变量注入覆盖所有 git config。","Pin Git commits to the environment's own author identity; env-var injection overrides all git config."],
+  ["dsh-context-doctor","Zhenyu98","runtime","上下文注入审计：指令链、技能目录、工具 schema 的 token 成本，检出重复与冲突。","Context injection audit: token costs of instruction chains / skill catalogs / tool schemas, duplicate and conflict detection."],
+  ["dsh-plugin-check","omdsh-dev","runtime","插件体检：清单协议、补丁格式、构建陷阱，零依赖且只读。","Plugin health checks: manifest protocol / patch format / build traps, zero-dependency and read-only."],
+  ["dsh-security-audit","omdsh-dev","runtime","本地安全审计：配置、插件来源、会话、网络暴露，输出只读脱敏风险报告。","Local security audit: config, plugin origins, sessions, network exposure — read-only redacted risk report."],
+  ["dsh-session-health","omdsh-dev","runtime","会话文件的帧级扫描诊断，检出撕裂、损坏与空帧。","Frame-level scan diagnostics for session files (torn/corrupt/empty detection)."],
+  ["dsh-evolve","william-jin-cmu","runtime","自演化：代理在会话中给自己热挂载或移除持久插件。","Self-evolution: the agent hot-mounts/removes persistent plugins on itself mid-session."],
+  ["dsh-trace","vibeinging","runtime","遥测后端，把轮次、模型步骤与工具调用导出到 yiTrace。","Telemetry backend exporting turns, model steps, and tool calls to yiTrace."],
+  ["sandbox-micro","omdsh-dev","runtime","microsandbox 后端支持。","Support for the microsandbox backend."],
+  ["sandbox-mxc","omdsh-dev","runtime","微软跨平台沙箱支持。","Microsoft cross-platform sandbox support."],
+  ["sandbox-nono","omdsh-dev","runtime","nono 沙箱后端支持。","Support for the nono sandbox backend."],
+  ["dsh-agent-budget","vibeinging","runtime","代理树的 token 预算管理。","Agent-tree token budget management."],
+  ["dsh-llm-fallbacks","btspoony","runtime","按角色的 LLM 重试与降级策略。","Role-based LLM retry & fallback strategies."],
+  ["dsh-tool-approval","ilharp","runtime","手动审批模式（Manual Mode / Ask Mode）。","Manual approval mode (Manual Mode / Ask Mode)."],
+  ["plugin-template","omdsh-dev","runtime","插件模板仓库，基于官方 turtle-ui 仓库。","Plugin template repo (based on the official turtle-ui repo)."],
+  ["Qwen-MM-Plugins","omdsh-dev","runtime","Qwen 多模态插件支持。","Qwen multi-modal plugin support."],
+  ["dsh-tps","Small-tailqwq","runtime","TPS 指标插件。","A TPS metrics plugin."],
+
+  ["dsh-ads","Nagi-ovo","fun","2005 年中文网风格的恶搞广告：侧栏横幅、聊天内信息流、角落弹窗，以及命中区比看起来更小的关闭按钮。全属虚构。","Parody ads in 2005-Chinese-web style: sidebar banners, in-chat feeds, corner popups, and a close button whose hit area is smaller than it looks. All fictional."],
+  ["dsh-gomoku","omdsh-dev","fun","和 AI 下五子棋，或者让两个 AI 互殴。","Play Gomoku against the AI, or let two AIs battle it out."],
+  ["dsh-stock-market","AnacondaKC","fun","修复了「写代码时账户不会亏钱」这个 bug。","Fixes the bug where your account can't lose money while you code."],
+  ["dsh-emoji","hellodigua","fun","自动给 AI 回复加 emoji。","Automatically add emojis to AI replies."],
+  ["dsh-minigames","lhh010","fun","侧栏游戏厅：18 个离线小游戏，边等模型边玩。","Side-panel arcade: 18 offline mini-games to play while the model thinks."],
+  ["dsh-stickers","william-jin-cmu","fun","用户与代理之间的双向贴纸互动。","Bidirectional sticker reactions between user and agent."],
+  ["whale-girl","vlln","fun","桌面宠物：角落漂浮，可拖、可喂、可玩。","Desktop pet (QQ-pet style): floats in the corner, draggable, feedable, playable."],
+  ["deepseek-manners","Moeblack","fun","每条消息后追加一句感谢。讲点礼貌。","Append a thank-you note after every message. Mind your manners."],
+  ["dsh-plugin-d399","HuanLinOTO","fun","模型生成时弹出小游戏菜单：wordle、消消乐，可扩展。","Pops up a mini-game menu (wordle, match-3, extensible) while the model generates."],
+  ["dsh-auto-chess","omdsh-dev","fun","自走棋：人机对战，或 AI 互战。","Auto chess: human vs AI, or AI vs AI."],
+  ["dsh-douyin","AnacondaKC","fun","短视频侧栏：原生播放器、剧集导航、精确历史回放。","Short-video sidebar: native player, series navigation, precise history replay."]
+];
+
+const TABS = [
+  ["home", "首页", "Home"], ["catalog", "目录", "Catalog"], ["rank", "排行榜", "Leaderboard"],
+  ["submit", "收录", "Get listed"], ["guide", "开发指南", "Build one"]
+];
+
+const GUIDE = [
+  ["01","从模板起步","Start from the template","官方模板仓库已经把清单、构建与目录结构摆好了，克隆下来改名字比从零搭快得多。","The template repo already has the manifest, build setup, and directory layout in place — clone and rename.","https://github.com/omdsh-dev/plugin-template","plugin-template"],
+  ["02","声明插件清单","Declare the manifest","dsh 靠清单认识你的插件：它叫什么、进入点在哪、需要哪些权限与配置。","dsh discovers your plugin through its manifest: name, entry point, permissions, and configuration.","",""],
+  ["03","往上下文里注册","Register on the context","Cordis 的插件拿到一个 ctx，往上面挂工具、命令、界面或模型提供方；卸载时框架会自动收回。","A Cordis plugin receives a ctx and attaches tools, commands, UI, or model providers to it; the framework tears them down on unload.","https://github.com/deepseek-ai/deepseek-harness","架构文档 / Architecture docs"],
+  ["04","跑一遍体检","Run the health check","发布前用社区体检工具扫一遍：清单协议、补丁格式、构建陷阱，只读不改。","Scan with the community health checker before publishing: manifest protocol, patch format, build traps. Read-only.","https://github.com/omdsh-dev/dsh-plugin-check","dsh-plugin-check"],
+  ["05","打话题发布","Tag and ship","仓库设置里加上 dsh-plugin 话题，写好 README 与许可 —— 剩下的交给收录链路。","Add the dsh-plugin topic in repo settings, write a README and license, and let the listing pipeline do the rest.","https://github.com/topics/dsh-plugin","topics/dsh-plugin"]
+];
+
+const GUIDE_REPOS = [
+  ["plugin-template","omdsh-dev","最小可用骨架，照着改就能跑。","Minimal working skeleton to copy."],
+  ["dsh-plugin-check","omdsh-dev","读它的规则集，等于读一份非正式的插件规范。","Reading its rule set is the closest thing to an informal spec."],
+  ["dsh-toolkit","omdsh-dev","十个确定性工具装在一个插件里，工具类插件的范本。","Ten deterministic tools in one plugin — the reference for tool-type plugins."],
+  ["dsh-genui","omdsh-dev","界面类插件里做得最深的一个，含事件回环。","The deepest UI-side plugin, including the event loop back to the model."],
+  ["dsh-security-audit","omdsh-dev","想知道别人会怎么审你的插件，先看它查什么。","Want to know how others will audit you? See what it looks for."]
+];
+
+const CHECKLIST = [
+  ["README 说清它做什么、要什么权限、怎么关掉。","README states what it does, what it needs, and how to turn it off."],
+  ["带许可文件。没有许可等于别人不敢用。","Ship a license. No license means nobody can safely use it."],
+  ["声明清楚会不会读写工作区文件、会不会联网。","Be explicit about workspace file access and network calls."],
+  ["在当前 dsh 版本上实测一次 —— 预览期接口会变。","Test against the current dsh build; preview-stage APIs move."],
+  ["话题、描述、仓库名保持一致，方便被搜到。","Keep topic, description, and repo name consistent so search finds you."]
+];
+
+const ANCHORS = { ui: "#ui-enhancements", session: "#sessions--messages", tools: "#tools--capabilities", workflow: "#workflow--automation", notify: "#notifications--integrations", runtime: "#development--runtime", fun: "#just-for-fun" };
+const LS = "dsh-hub-prefs-v1";
+const TLS = "dsh-hub-topic-v1";
+const TTL = 45 * 60 * 1000;
+const KEYS = {};
+DATA.forEach((r) => { KEYS[(r[1] + "/" + r[0]).toLowerCase()] = 1; });
+
+class Component extends DCLogic {
+  state = {
+    page: "home", q: "", cat: "all", sort: "curated", view: "list", favOnly: false,
+    selIdx: -1, copied: null, installCopied: false, badgeCopied: false,
+    theme: "dark", lang: "zh", favs: [], live: null, liveState: "loading"
+  };
+
+  componentDidMount() {
+    try {
+      const p = JSON.parse(localStorage.getItem(LS) || "{}");
+      const next = {};
+      if (this.props.defaultLang) next.lang = this.props.defaultLang;
+      if (this.props.defaultTheme) next.theme = this.props.defaultTheme;
+      if (this.props.defaultView) next.view = this.props.defaultView;
+      if (p.theme === "light" || p.theme === "dark") next.theme = p.theme;
+      if (p.lang === "zh" || p.lang === "en") next.lang = p.lang;
+      if (p.view === "list" || p.view === "cards") next.view = p.view;
+      if (Array.isArray(p.favs)) next.favs = p.favs;
+      if (Object.keys(next).length) this.setState(next);
+    } catch (e) {}
+
+    this._key = (e) => { if (e.key === "Escape" && this.state.selIdx >= 0) this.setState({ selIdx: -1 }); };
+    window.addEventListener("keydown", this._key);
+
+    this.loadTopic();
+  }
+
+  async loadTopic() {
+    let cache = null;
+    try { cache = JSON.parse(localStorage.getItem(TLS) || "null"); } catch (e) {}
+    const fresh = !!(cache && cache.map && Date.now() - cache.ts < TTL);
+    const map = fresh ? Object.assign({}, cache.map) : {};
+    let total = fresh ? cache.total : null;
+    let scanned = fresh ? cache.scanned || 0 : 0;
+
+    const isDone = () => total !== null && (scanned >= Math.min(total, 1000) || Object.keys(map).length >= DATA.length);
+
+    const push = (state, persist) => {
+      if (this._dead) return;
+      const ts = persist ? Date.now() : (cache && cache.ts) || Date.now();
+      this.setState({ live: Object.assign({}, map), liveState: state, topicTotal: total, scanned, scanTs: ts });
+      if (persist) {
+        try { localStorage.setItem(TLS, JSON.stringify({ ts, total, scanned, map })); } catch (e) {}
+      }
+    };
+
+    if (fresh) {
+      const done = isDone();
+      push(done ? "ok" : "partial", false);
+      if (done) return;
+    }
+
+    let page = Math.floor(scanned / 100) + 1;
+    try {
+      while (page <= 10) {
+        const r = await fetch("https://api.github.com/search/repositories?q=topic%3Adsh-plugin&sort=stars&order=desc&per_page=100&page=" + page);
+        if (!r.ok) {
+          const reset = Number(r.headers.get("x-ratelimit-reset") || 0) * 1000;
+          if (!this._dead && reset) this.setState({ rateReset: reset });
+          throw new Error("http " + r.status);
+        }
+        const j = await r.json();
+        if (total === null || !total) total = j.total_count || 0;
+        const items = j.items || [];
+        items.forEach((it) => {
+          const key = String(it.full_name).toLowerCase();
+          if (!KEYS[key]) return;
+          map[key] = {
+            stars: it.stargazers_count, pushed: it.pushed_at,
+            license: it.license && it.license.spdx_id && it.license.spdx_id !== "NOASSERTION" ? it.license.spdx_id : ""
+          };
+        });
+        scanned += items.length;
+        const done = items.length < 100 || isDone();
+        push(done ? "ok" : "partial", true);
+        if (done || this._dead) return;
+        page++;
+        await new Promise((res) => setTimeout(res, 240));
+      }
+      push("ok", true);
+    } catch (e) {
+      if (this._dead) return;
+      if (Object.keys(map).length > 0) push("partial", true);
+      else this.setState({ liveState: "fail" });
+    }
+  }
+
+  componentWillUnmount() { this._dead = true; window.removeEventListener("keydown", this._key); clearTimeout(this._t); }
+
+  persist(patch) {
+    this.setState(patch, () => {
+      try {
+        const s = this.state;
+        localStorage.setItem(LS, JSON.stringify({ theme: s.theme, lang: s.lang, view: s.view, favs: s.favs }));
+      } catch (e) {}
+    });
+  }
+
+  copy(text, id) {
+    try { navigator.clipboard.writeText(text); } catch (e) {}
+    this.setState({ copied: id });
+    clearTimeout(this._t);
+    this._t = setTimeout(() => this.setState({ copied: null }), 1600);
+  }
+
+  ago(iso, lang) {
+    if (!iso) return lang === "zh" ? "—" : "—";
+    const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+    if (d <= 0) return lang === "zh" ? "今天" : "today";
+    if (d < 30) return lang === "zh" ? d + " 天前" : d + "d ago";
+    if (d < 365) return lang === "zh" ? Math.floor(d / 30) + " 个月前" : Math.floor(d / 30) + "mo ago";
+    return lang === "zh" ? Math.floor(d / 365) + " 年前" : Math.floor(d / 365) + "y ago";
+  }
+
+  renderVals() {
+    const S = this.state;
+    const zh = S.lang === "zh";
+    const live = S.live;
+    const catMeta = {}; CATS.forEach(([id, z, e]) => { catMeta[id] = { zh: z, en: e }; });
+
+    const all = DATA.map((r, i) => {
+      const [name, owner, cat, dzh, den] = r;
+      const key = (owner + "/" + name).toLowerCase();
+      const hit = live ? live[key] : null;
+      const fav = S.favs.indexOf(key) >= 0;
+      return {
+        idx: i, no: String(i + 1).padStart(3, "0"), name, owner, cat, zh: dzh, en: den, key, fav,
+        catZh: catMeta[cat].zh, catEn: catMeta[cat].en,
+        stars: hit ? hit.stars : null, pushed: hit ? hit.pushed : null,
+        license: hit && hit.license ? hit.license : "",
+        repo: "github.com/" + owner + "/" + name,
+        url: "https://github.com/" + owner + "/" + name,
+        listUrl: "https://github.com/awesome-dsh-plugin/awesome-dsh-plugin" + ANCHORS[cat],
+        onTopic: !!hit
+      };
+    });
+
+    const q = S.q.trim().toLowerCase();
+    let rows = all.filter((p) => {
+      if (S.favOnly && !p.fav) return false;
+      if (S.cat !== "all" && p.cat !== S.cat) return false;
+      if (!q) return true;
+      return (p.name + " " + p.owner + " " + p.zh + " " + p.en + " " + p.catZh).toLowerCase().includes(q);
+    });
+    if (S.sort === "name") rows = rows.slice().sort((a, b) => a.name.localeCompare(b.name));
+    else if (S.sort === "owner") rows = rows.slice().sort((a, b) => a.owner.localeCompare(b.owner) || a.name.localeCompare(b.name));
+    else if (S.sort === "stars") rows = rows.slice().sort((a, b) => (b.stars || -1) - (a.stars || -1));
+    else if (S.sort === "updated") rows = rows.slice().sort((a, b) => new Date(b.pushed || 0) - new Date(a.pushed || 0));
+
+    const decorate = (p) => ({
+      ...p,
+      on: S.selIdx === p.idx,
+      copied: S.copied === p.idx, notCopied: S.copied !== p.idx,
+      starLabel: p.stars === null ? "★ —" : "★ " + p.stars,
+      starFg: p.stars === null ? "var(--fg3)" : "var(--star)",
+      updated: this.ago(p.pushed, S.lang),
+      updatedFull: p.pushed ? (zh ? "更新于 " + this.ago(p.pushed, S.lang) : "pushed " + this.ago(p.pushed, S.lang)) : (zh ? "更新时间未知" : "no push data"),
+      favFg: p.fav ? "var(--star)" : "var(--fg3)",
+      srcTag: p.onTopic ? "TOPIC" : "LIST",
+      srcFg: p.onTopic ? "var(--ac2)" : "var(--fg3)",
+      srcBd: p.onTopic ? "var(--ac)" : "var(--line2)",
+      cardBd: p.fav ? "var(--star)" : "var(--line)",
+      open: () => this.setState({ selIdx: p.idx }),
+      copy: (e) => { e.stopPropagation(); this.copy(p.url, p.idx); },
+      toggleFav: (e) => {
+        e.stopPropagation();
+        const has = S.favs.indexOf(p.key) >= 0;
+        this.persist({ favs: has ? S.favs.filter((k) => k !== p.key) : S.favs.concat([p.key]) });
+      }
+    });
+
+    const decorated = rows.map(decorate);
+    const withStars = all.filter((p) => p.stars !== null);
+    const selRaw = S.selIdx >= 0 ? all.find((p) => p.idx === S.selIdx) : null;
+    const sel = selRaw ? decorate(selRaw) : null;
+
+    const topStars = withStars.slice().sort((a, b) => b.stars - a.stars).slice(0, 20)
+      .map((p, i) => ({ ...decorate(p), rank: String(i + 1).padStart(2, "0"), rankFg: i < 3 ? "var(--ac2)" : "var(--fg3)" }));
+    const topFresh = withStars.slice().sort((a, b) => new Date(b.pushed) - new Date(a.pushed)).slice(0, 20).map(decorate);
+
+    const featured = (withStars.length ? withStars.slice().sort((a, b) => b.stars - a.stars) : all)
+      .slice(0, 6).map((p) => ({ ...decorate(p), stars: p.stars === null ? "—" : p.stars }));
+
+    const hasLive = !!(S.live && Object.keys(S.live).length);
+    const fullScan = S.liveState === "ok";
+    const liveOk = hasLive;
+    const matched = withStars.length;
+    const scanned = S.scanned || 0;
+    const starSum = withStars.reduce((n, p) => n + p.stars, 0);
+    const ageMin = S.scanTs ? Math.floor((Date.now() - S.scanTs) / 60000) : 0;
+    const ageZh = !S.scanTs ? "" : ageMin < 1 ? "刚刚" : ageMin + " 分钟前";
+    const ageEn = !S.scanTs ? "" : ageMin < 1 ? "just now" : ageMin + " min ago";
+    const waitMin = S.rateReset ? Math.max(1, Math.ceil((S.rateReset - Date.now()) / 60000)) : 0;
+    const waitZh = waitMin ? "GitHub 接口限流，约 " + waitMin + " 分钟后恢复。" : "没能连上 GitHub（限流或网络问题）。";
+    const waitEn = waitMin ? "GitHub rate limit hit; back in about " + waitMin + " min." : "Couldn't reach GitHub (rate limit or network).";
+
+    const sortOptions = [
+      { id: "curated", label: zh ? "名单顺序" : "List order" },
+      { id: "stars", label: zh ? "按星标" : "By stars" },
+      { id: "updated", label: zh ? "最近更新" : "Recently pushed" },
+      { id: "name", label: zh ? "名称 A→Z" : "Name A→Z" },
+      { id: "owner", label: zh ? "按作者" : "By author" }
+    ];
+
+    return {
+      theme: S.theme, lang: S.lang,
+      themeIcon: S.theme === "dark" ? "☀" : "☾",
+      toggleTheme: () => this.persist({ theme: S.theme === "dark" ? "light" : "dark" }),
+      toggleLang: () => this.persist({ lang: zh ? "en" : "zh" }),
+
+      tabs: TABS.map(([id, z, e]) => ({
+        id, zh: z, en: e, on: S.page === id,
+        fg: S.page === id ? "var(--fg)" : "var(--fg2)",
+        go: () => this.setState({ page: id, selIdx: -1 })
+      })),
+      isHome: S.page === "home", isCatalog: S.page === "catalog", isRank: S.page === "rank",
+      isSubmit: S.page === "submit", isGuide: S.page === "guide",
+      goHome: () => this.setState({ page: "home" }),
+      goCatalog: () => this.setState({ page: "catalog" }),
+      goRank: () => this.setState({ page: "rank" }),
+
+      total: DATA.length,
+      topicCount: liveOk ? (S.topicTotal || Object.keys(live).length) : "—",
+      ownerCount: new Set(DATA.map((r) => r[1])).size,
+      starTotal: liveOk ? (starSum >= 1000 ? (starSum / 1000).toFixed(1) + "k" : starSum) : "—",
+      matched, scanned,
+      matchNoteZh: liveOk ? "已匹配 " + matched + "/" + DATA.length : "等待实时数据",
+      matchNoteEn: liveOk ? matched + "/" + DATA.length + " matched" : "awaiting live data",
+      ageZh, ageEn,
+      syncLabel: fullScan
+        ? (zh ? "已扫完 dsh-plugin 话题全部 " + scanned + " 个仓库 · " + ageZh : "scanned all " + scanned + " repos in the dsh-plugin topic · " + ageEn)
+        : liveOk
+          ? (zh ? "话题扫描未完成，已读 " + scanned + " 个" : "topic scan incomplete, " + scanned + " read")
+          : (zh ? (waitMin ? "限流中，约 " + waitMin + " 分钟后恢复" : "实时数据未加载") : (waitMin ? "rate-limited, back in ~" + waitMin + " min" : "live data unavailable")),
+      liveNote: fullScan
+        ? (zh ? "星标与推送时间取自 " + ageZh + "那次 dsh-plugin 话题扫描 —— 话题下全部 " + scanned + " 个仓库都翻了一遍，榜上是其中同时被精选名单收录的 " + matched + " 个。结果在本地缓存 45 分钟。" : "Stars and push times come from the dsh-plugin topic scan " + ageEn + ". All " + scanned + " repos in the topic were enumerated; the board shows the " + matched + " that are also on the curated list. Cached locally for 45 minutes.")
+        : liveOk
+          ? (zh ? "话题扫描没跑完：已读 " + scanned + " 个仓库、匹配上 " + matched + " 条。" + waitZh + "已读到的部分会缓存 45 分钟，恢复后再打开会接着往下扫。" : "The topic scan didn't finish: " + scanned + " repos read, " + matched + " matched. " + waitEn + " What was read is cached for 45 minutes and the scan resumes from there.")
+          : (zh ? waitZh + "排行榜暂时是空的，恢复后刷新即可。" : waitEn + " The leaderboard is empty until then; refresh once it's back."),
+
+      featured, topStars, topFresh,
+      catTiles: CATS.map(([id, z, e, hz, he]) => ({
+        id, zh: z, en: e, hintZh: hz, hintEn: he,
+        count: DATA.filter((r) => r[2] === id).length,
+        go: () => this.setState({ page: "catalog", cat: id, q: "", favOnly: false })
+      })),
+
+      rows: decorated,
+      shown: decorated.length,
+      empty: decorated.length === 0,
+      isList: S.view === "list", isCards: S.view === "cards",
+      setList: () => this.persist({ view: "list" }),
+      setCards: () => this.persist({ view: "cards" }),
+      listBg: S.view === "list" ? "var(--ac)" : "var(--bg2)",
+      listFg: S.view === "list" ? "#fff" : "var(--fg2)",
+      cardBg: S.view === "cards" ? "var(--ac)" : "var(--bg2)",
+      cardFg: S.view === "cards" ? "#fff" : "var(--fg2)",
+
+      cats: [{ id: "all", zh: "全部", en: "All", count: DATA.length }]
+        .concat(CATS.map(([id, z, e]) => ({ id, zh: z, en: e, count: DATA.filter((r) => r[2] === id).length })))
+        .map((c) => ({
+          ...c,
+          bg: S.cat === c.id ? "var(--ac)" : "transparent",
+          fg: S.cat === c.id ? "#fff" : "var(--fg2)",
+          bd: S.cat === c.id ? "var(--ac)" : "var(--line2)",
+          select: () => this.setState({ cat: c.id })
+        })),
+
+      query: S.q, hasQuery: S.q.length > 0,
+      searchPlaceholder: zh ? "搜索名称、作者或描述" : "Search name, author, description",
+      onSearch: (e) => this.setState({ q: e.target.value }),
+      clearQuery: () => this.setState({ q: "" }),
+      sort: S.sort, sortOptions,
+      onSort: (e) => this.setState({ sort: e.target.value }),
+      resetAll: () => this.setState({ q: "", cat: "all", favOnly: false }),
+
+      favCount: S.favs.length,
+      favOnly: S.favOnly,
+      favBtnFg: S.favOnly ? "var(--star)" : "var(--fg2)",
+      toggleFavOnly: () => this.setState({ page: "catalog", favOnly: !S.favOnly }),
+
+      guideSteps: GUIDE.map(([no, z, e, bz, be, url, label]) => ({
+        no, zh: z, en: e, bodyZh: bz, bodyEn: be, url, linkLabel: label, hasLink: !!url
+      })),
+      guideRepos: GUIDE_REPOS.map(([name, owner, z, e]) => ({
+        name, zh: z, en: e, url: "https://github.com/" + owner + "/" + name
+      })),
+      checklist: CHECKLIST.map(([z, e]) => ({ zh: z, en: e })),
+
+      copyInstall: () => {
+        try { navigator.clipboard.writeText("npx @deepseek-ai/dsh web"); } catch (e) {}
+        this.setState({ installCopied: true });
+        setTimeout(() => this.setState({ installCopied: false }), 1600);
+      },
+      installCopied: S.installCopied, installNotCopied: !S.installCopied,
+      copyBadge: () => {
+        try { navigator.clipboard.writeText("[![Awesome DSH Plugin](https://awesome-dsh-plugin.com/badge.svg)](https://awesome-dsh-plugin.com)"); } catch (e) {}
+        this.setState({ badgeCopied: true });
+        setTimeout(() => this.setState({ badgeCopied: false }), 1600);
+      },
+      badgeCopied: S.badgeCopied, badgeNotCopied: !S.badgeCopied,
+
+      close: () => this.setState({ selIdx: -1 }),
+      copySel: () => { if (sel) this.copy(sel.url, sel.idx); },
+      favSel: () => { if (sel) sel.toggleFav({ stopPropagation() {} }); },
+      sel: sel ? {
+        ...sel,
+        hasLicense: !!sel.license,
+        favLabelZh: selRaw.fav ? "已收藏" : "收藏",
+        favLabelEn: selRaw.fav ? "Saved" : "Save",
+        srcNote: sel.onTopic
+          ? (zh ? "该仓库已打上 dsh-plugin 话题，星标与推送时间来自 " + ageZh + "那次话题扫描；同时也被社区精选名单收录，中文描述译自那份名单。"
+                : "This repo carries the dsh-plugin topic. Stars and push time come from the topic scan " + ageEn + "; it is also on the community curated list, the source of its description.")
+          : fullScan
+            ? (zh ? "该条目来自社区精选名单。本次已把 dsh-plugin 话题下全部 " + scanned + " 个仓库翻了一遍，其中没有它 —— 作者应该还没给仓库打上这个话题，所以没有实时星标与更新时间。"
+                  : "This entry comes from the curated list. All " + scanned + " repos in the dsh-plugin topic were enumerated and this one wasn't among them, so the author likely hasn't tagged it — hence no live stars or push time.")
+            : (zh ? "该条目来自社区精选名单。本次话题扫描没跑完（已读 " + scanned + " 个），所以无法判断它是否打了 dsh-plugin 话题，实时数据也就缺着。"
+                  : "This entry comes from the curated list. The topic scan didn't finish (" + scanned + " repos read), so whether it carries the dsh-plugin topic is unknown and live data is missing.")
+      } : null
+    };
+  }
+}
+</script>
+</body>
+</html>
