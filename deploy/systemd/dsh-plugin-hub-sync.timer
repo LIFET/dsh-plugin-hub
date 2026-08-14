@@ -1,0 +1,12 @@
+[Unit]
+Description=Run DSH Plugin Hub registry synchronization every 30 minutes
+
+[Timer]
+OnCalendar=*:0/30
+Persistent=true
+RandomizedDelaySec=60s
+AccuracySec=1min
+Unit=dsh-plugin-hub-sync.service
+
+[Install]
+WantedBy=timers.target

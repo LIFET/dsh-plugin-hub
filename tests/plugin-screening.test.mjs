@@ -2,12 +2,20 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   categoryFromText,
+  classifyInspectionFailure,
   markInspectionUnavailable,
   manifestSummary,
   normalizeRepositoryPath,
   sanitizeRegistryInstallEvidence,
   screenRepository,
 } from "../lib/plugin-screening.mjs";
+
+test("classifies deterministic oversized inspections for long backoff", () => {
+  assert.equal(classifyInspectionFailure("Response exceeded 140000 bytes: https://example.test/client.js"), "uninspectable");
+  assert.equal(classifyInspectionFailure("Response too large (400000 bytes): https://example.test/commit"), "uninspectable");
+  assert.equal(classifyInspectionFailure("403 rate limit reached"), "transient");
+  assert.equal(classifyInspectionFailure("network timeout"), "transient");
+});
 
 const safeMeta = {
   archived: false,
@@ -141,9 +149,11 @@ test("removes unpinned or mismatched commands from stored registry data", () => 
       { ...base, screenedCommit: null, installCommand: "dsh plugin --profile web add github:owner/plugin" },
       { ...base, screenedCommit: commit, installCommand: "dsh plugin --profile web add github:owner/plugin#wrong" },
       { ...base, screenedCommit: commit, installCommand: `dsh plugin --profile web add github:owner/plugin#${commit}` },
+      { ...base, screening: { state: "clear" }, screenedCommit: commit, installCommand: `dsh plugin --profile web add github:owner/plugin#${commit}` },
     ],
   });
   assert.equal(registry.plugins[0].installCommand, null);
   assert.equal(registry.plugins[1].installCommand, null);
-  assert.equal(registry.plugins[2].installCommand, `dsh plugin --profile web add github:owner/plugin#${commit}`);
+  assert.equal(registry.plugins[2].installCommand, null);
+  assert.equal(registry.plugins[3].installCommand, `dsh plugin --profile web add github:owner/plugin#${commit}`);
 });

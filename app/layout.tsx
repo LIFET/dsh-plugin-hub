@@ -1,24 +1,16 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+const preferenceBootstrap = `try{const p=JSON.parse(localStorage.getItem('dsh-plugin-hub-prefs-v2')||'{}');if(p.theme==='dark'||p.theme==='light'){document.documentElement.dataset.theme=p.theme;document.documentElement.style.colorScheme=p.theme}if(p.lang==='en')document.documentElement.lang='en'}catch{}`;
 
 export const metadata: Metadata = {
-    metadataBase: new URL("https://dsh.lanshuagent.com"),
+    metadataBase: new URL("https://apiu.cc"),
     title: {
       default: "DSH 插件资源站",
       template: "%s · DSH 插件资源站",
     },
     description: "基于 GitHub 真实数据的 DeepSeek Harness 社区插件目录与安装证据索引。",
+    alternates: { canonical: "/" },
     keywords: ["DeepSeek Harness", "DSH", "dsh-plugin", "插件目录", "AI Agent"],
     icons: {
       icon: [{ url: "/favicon.svg", type: "image/svg+xml", sizes: "any" }],
@@ -48,11 +40,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-CN" suppressHydrationWarning>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        {children}
-      </body>
+      <head><script dangerouslySetInnerHTML={{ __html: preferenceBootstrap }} /></head>
+      <body>{children}</body>
     </html>
   );
 }
