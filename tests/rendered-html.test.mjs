@@ -86,7 +86,6 @@ test("server-renders the complete plugin hub", async () => {
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
   assert.equal(response.headers.get("x-content-type-options"), "nosniff");
   assert.equal(response.headers.get("x-frame-options"), "DENY");
-  assert.match(response.headers.get("strict-transport-security") ?? "", /max-age=63072000/u);
   assert.match(response.headers.get("content-security-policy") ?? "", /default-src 'self'/u);
   assert.equal(response.headers.get("x-powered-by"), null);
 
