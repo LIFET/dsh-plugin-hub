@@ -19,7 +19,7 @@ const PAGES: Array<{ id: Exclude<PageId, "plugin">; zh: string; en: string }> = 
   { id: "catalog", zh: "目录", en: "Catalog" },
   { id: "rank", zh: "排行榜", en: "Rank" },
   { id: "submit", zh: "收录", en: "Submit" },
-  { id: "guide", zh: "开发指南", en: "Guide" },
+  { id: "guide", zh: "指南", en: "Guide" },
 ];
 
 const CATEGORY_ORDER: CategoryId[] = [
@@ -94,8 +94,13 @@ function pluginPath(plugin: PluginRecord) {
   return `/plugin/${plugin.id.split("/").map(encodeURIComponent).join("/")}`;
 }
 
+function preferDedicatedPluginPage() {
+  return typeof window !== "undefined" && window.matchMedia("(max-width: 980px)").matches;
+}
+
 function openInDrawer(event: MouseEvent<HTMLAnchorElement>, onOpen: () => void) {
   if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  if (preferDedicatedPluginPage()) return;
   event.preventDefault();
   onOpen();
 }
@@ -375,6 +380,10 @@ export function PluginHub({
   }, [lang, page, selected]);
 
   const openPlugin = useCallback((plugin: PluginRecord) => {
+    if (preferDedicatedPluginPage()) {
+      window.location.assign(pluginPath(plugin));
+      return;
+    }
     returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     window.history.pushState({ drawer: true }, "", pluginPath(plugin));
     setSelected(plugin);
@@ -545,6 +554,7 @@ export function PluginHub({
 
   return (
     <div className="hub" data-theme={theme} data-lang={lang}>
+      <a className="skip-link" href="#main-content">{text(lang, "跳到主要内容", "Skip to content")}</a>
       <div className="site-frame" inert={page !== "plugin" && selected ? true : undefined}>
       <header className="site-header">
         <div className="site-header__inner">
@@ -586,7 +596,7 @@ export function PluginHub({
         </div>
       </header>
 
-      <main>
+      <main id="main-content">
         {page === "home" && (
           <>
             <section className="hero">

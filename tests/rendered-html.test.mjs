@@ -102,6 +102,7 @@ test("server-renders the complete plugin hub", async () => {
   assert.match(html, /作者：岚叔/);
   assert.match(html, /JSON API/);
   assert.match(html, /href="\/plugins"/);
+  assert.match(html, /跳到主要内容|Skip to content/u);
   assert.match(html, /<form[^>]+(?:class="hero-search"|action="\/plugins")/u);
   assert.match(html, /application\/ld\+json/u);
   assert.match(html, /theme-color/u);
