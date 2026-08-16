@@ -2,7 +2,7 @@
 
 ## 当前项目状态
 
-全面排查修复已部署到 `https://apiu.cc`。生产 release 为 `20260815T031300-58d6add`，源码经 PR #3、#4 合并到 `main`；旧 release 与注册表备份均保留。
+详情页、扫描 409、缓存与 SEO 修复已部署到 `https://apiu.cc`。生产 release 为 `20260816T154113-c5ac44a`（`main` `c5ac44a`）；上一版 `20260815T031300-58d6add` 与注册表备份均保留。
 
 ## 已完成内容
 
@@ -31,4 +31,5 @@ Build/TypeScript、Lint、26 项测试、`npm audit --omit=dev`、差异格式�
 
 ## 下一步
 
-保持每 30 分钟自动同步，并在 2026-11-13 前轮换 `GITHUB_TOKEN`。
+- 给 `www.apiu.cc` 增加指向 `47.76.25.43` 的 A 记录后，再执行 `certbot --nginx -d apiu.cc -d www.apiu.cc --expand`，HTTPS www 才会有合法证书。
+- 保持每 30 分钟自动同步，并在 2026-11-13 前轮换 `GITHUB_TOKEN`。
