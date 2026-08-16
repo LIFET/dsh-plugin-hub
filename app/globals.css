@@ -610,6 +610,13 @@ html:not([data-theme="dark"]) .hub[data-theme="light"] {
   font-size: 11px;
 }
 
+.featured-card .signal {
+  position: relative;
+  z-index: 1;
+  align-self: flex-start;
+  margin-top: 10px;
+}
+
 .featured-card__desc {
   display: -webkit-box;
   margin-top: 22px;

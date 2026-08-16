@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import type { CategoryId, PluginRegistryData } from "@/lib/plugin-data";
+import { selectFeaturedPlugins } from "@/lib/plugin-screening.mjs";
 import { readPluginRegistryWithSource } from "@/worker/plugin-registry";
 import { jsonLdScript } from "./json-ld";
 import { PluginHub } from "./plugin-hub";
@@ -32,10 +33,7 @@ export default async function Home() {
     ]),
   ) as Record<CategoryId, number>;
   const inspectedCount = registry.plugins.filter((plugin) => plugin.screening.scope === "source").length;
-  const featured = [...registry.plugins]
-    .filter((plugin) => plugin.stars !== null)
-    .sort((a, b) => (b.stars || 0) - (a.stars || 0))
-    .slice(0, 6);
+  const featured = selectFeaturedPlugins(registry.plugins, 6);
   const data: PluginRegistryData = { ...registry, plugins: featured };
   const siteName = initialLanguage === "en" ? "DSH Plugin Hub" : "DSH 插件资源站";
   return (

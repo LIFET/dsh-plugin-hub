@@ -12,7 +12,10 @@ import {
   sanitizePublicScanError,
   sanitizeRegistryInstallEvidence,
   screenRepository,
+  selectFeaturedPlugins,
   suggestedInstallCommand,
+  visiblePluginName,
+  inspectionQueuePriority,
 } from "../lib/plugin-screening.mjs";
 
 test("classifies deterministic oversized inspections for long backoff", () => {
@@ -43,6 +46,26 @@ test("raises the default scan budget when a GitHub token is present", () => {
   assert.equal(resolveRegistryScanLimit({}), 7);
   assert.equal(resolveRegistryScanLimit({ token: "github-token" }), 40);
   assert.equal(resolveRegistryScanLimit({ token: "github-token", requested: "12" }), 12);
+});
+
+test("prioritizes listed plugins that still need a source scan", () => {
+  assert.equal(inspectionQueuePriority({ screening: { scope: "manifest" } }), 0);
+  assert.equal(inspectionQueuePriority({ screening: { scope: "source" } }), 1);
+  assert.equal(inspectionQueuePriority(null), 2);
+});
+
+test("selects featured plugins without blocked entries", () => {
+  const featured = selectFeaturedPlugins([
+    { name: "blocked-star", stars: 900, screening: { state: "blocked" } },
+    { name: "clear-mid", stars: 40, screening: { state: "clear" } },
+    { name: "review-high", stars: 80, screening: { state: "review" } },
+  ], 2);
+  assert.deepEqual(featured.map((plugin) => plugin.name), ["review-high", "clear-mid"]);
+});
+
+test("strips npm scopes from visible plugin names", () => {
+  assert.equal(visiblePluginName({ name: "@nanmicoder/dsh-auto-mode", repo: "NanmiCoder/dsh-auto-mode" }), "dsh-auto-mode");
+  assert.equal(visiblePluginName({ name: "dsh-board", repo: "dfkai/dsh-board" }), "dsh-board");
 });
 
 test("suggests a commit-pinned command when a screened commit exists", () => {
@@ -99,6 +122,19 @@ test("uses the authoritative root tree when checking repository evidence", () =>
   assert.equal(result.checks.lockfile, true);
   assert.equal(result.checks.readme, true);
   assert.throws(() => repositoryRootFiles({ truncated: true, tree: [] }), /incomplete/u);
+});
+
+test("treats a missing lockfile as informational instead of forcing review", () => {
+  const result = screenRepository({
+    meta: safeMeta,
+    manifest: manifest(),
+    files: ["README.md", "LICENSE", "package.json"],
+    sourceFiles: [{ path: "lib/index.js", text: "export function apply(ctx) { return ctx; }" }],
+    readme: "## Security\nNo network or shell access.",
+  });
+  assert.equal(result.state, "clear");
+  assert.equal(result.checks.lockfile, false);
+  assert.ok(result.findings.some((finding) => finding.id === "lockfile-missing" && finding.severity === "info"));
 });
 
 test("marks a fully inspectable local-only plugin as clear", () => {
@@ -218,4 +254,28 @@ test("removes unpinned or mismatched commands from stored registry data", () => 
   assert.equal(registry.plugins[1].installCommand, null);
   assert.equal(registry.plugins[2].installCommand, null);
   assert.equal(registry.plugins[3].installCommand, `dsh plugin --profile web add github:owner/plugin#${commit}`);
+});
+
+test("reclassifies lockfile-only review plugins to clear and restores a pinned command", () => {
+  const commit = "c".repeat(40);
+  const registry = sanitizeRegistryInstallEvidence({
+    summary: { screeningClear: 0, screeningReview: 1, screeningBlocked: 0 },
+    plugins: [{
+      repo: "owner/plugin",
+      screenedCommit: commit,
+      installCommand: null,
+      manifest: { state: "verified" },
+      screening: {
+        scope: "source",
+        state: "review",
+        risk: "medium",
+        findings: [{ id: "lockfile-missing", severity: "medium", label: { zh: "无锁文件", en: "No lockfile" } }],
+      },
+    }],
+  });
+  assert.equal(registry.plugins[0].screening.state, "clear");
+  assert.equal(registry.plugins[0].screening.findings[0].severity, "info");
+  assert.equal(registry.plugins[0].installCommand, `dsh plugin --profile web add github:owner/plugin#${commit}`);
+  assert.equal(registry.summary.screeningClear, 1);
+  assert.equal(registry.summary.screeningReview, 0);
 });

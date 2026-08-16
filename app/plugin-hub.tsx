@@ -6,7 +6,7 @@ import type {
   PluginRecord,
   PluginRegistryData,
 } from "@/lib/plugin-data";
-import { comparePluginsByEvidence, suggestedInstallCommand } from "@/lib/plugin-screening.mjs";
+import { comparePluginsByEvidence, suggestedInstallCommand, visiblePluginName } from "@/lib/plugin-screening.mjs";
 import Link from "next/link";
 import { type FormEvent, type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -152,7 +152,7 @@ function PluginDetail({
         <span className={`evidence evidence--${sourceClass(plugin)}`}>{sourceLabel(plugin)}</span>
         <span className={`signal signal--${plugin.attention.level}`}>{signalLabel(plugin, lang)}</span>
       </div>
-      <h1 id="plugin-title">{plugin.name}</h1>
+      <h1 id="plugin-title">{visiblePluginName(plugin)}</h1>
       <p className="drawer-owner">{plugin.repo} · {plugin.owner} · {categoryLabel}</p>
       <div className="stat-chips">
         <span>★ {formatNumber(plugin.stars, lang)}</span>
@@ -233,7 +233,7 @@ function PluginCard({
         <span className="plugin-card__number">№ {String(plugin.order + 1).padStart(3, "0")}</span>
         <span className="plugin-card__copy">
           <span className="plugin-card__title-row">
-            <strong>{plugin.name}</strong>
+            <strong>{visiblePluginName(plugin)}</strong>
             <span className={`evidence evidence--${sourceClass(plugin)}`}>
               {sourceLabel(plugin)}
             </span>
@@ -368,7 +368,7 @@ export function PluginHub({
   }, [favorites, lang, preferencesReady, theme, view]);
 
   useEffect(() => {
-    const pageTitle = selected?.name || PAGES.find((item) => item.id === page)?.[lang] || "DSH";
+    const pageTitle = selected ? visiblePluginName(selected) : PAGES.find((item) => item.id === page)?.[lang] || "DSH";
     document.title = page === "home" && !selected
       ? text(lang, "DSH 插件资源站", "DSH Plugin Hub")
       : `${pageTitle} · ${text(lang, "DSH 插件资源站", "DSH Plugin Hub")}`;
@@ -651,8 +651,9 @@ export function PluginHub({
                 {featured.map((plugin, index) => (
                   <Link className="featured-card" href={pluginPath(plugin)} prefetch={false} key={plugin.id} onClick={(event) => openInDrawer(event, () => openPlugin(plugin))}>
                     <span className="featured-card__rank">0{index + 1}</span>
-                    <span className="featured-card__head"><strong>{plugin.name}</strong><em>★ {formatNumber(plugin.stars, lang)}</em></span>
+                    <span className="featured-card__head"><strong>{visiblePluginName(plugin)}</strong><em>★ {formatNumber(plugin.stars, lang)}</em></span>
                     <span className="featured-card__owner">{plugin.repo}</span>
+                    <span className={`signal signal--${plugin.attention.level}`}>{signalLabel(plugin, lang)}</span>
                     <span className="featured-card__desc">{plugin.description[lang]}</span>
                     <span className="featured-card__foot">{data.categories[plugin.category][lang]} <i>→</i></span>
                   </Link>
@@ -760,11 +761,11 @@ export function PluginHub({
             <div className="rank-grid">
               <div className="rank-panel">
                 <div className="rank-panel__heading"><span>★</span><div><h2>{text(lang, "按星标", "By stars")}</h2><p>{text(lang, "社区关注度", "Community attention")}</p></div></div>
-                <ol>{topStars.map((plugin, index) => <li key={plugin.id}><Link href={pluginPath(plugin)} prefetch={false} onClick={(event) => openInDrawer(event, () => openPlugin(plugin))}><b>{String(index + 1).padStart(2, "0")}</b><span><strong>{plugin.name}</strong><small>{plugin.owner}</small></span><em>★ {formatNumber(plugin.stars, lang)}</em></Link></li>)}</ol>
+                <ol>{topStars.map((plugin, index) => <li key={plugin.id}><Link href={pluginPath(plugin)} prefetch={false} onClick={(event) => openInDrawer(event, () => openPlugin(plugin))}><b>{String(index + 1).padStart(2, "0")}</b><span><strong>{visiblePluginName(plugin)}</strong><small>{plugin.repo}</small></span><em>★ {formatNumber(plugin.stars, lang)}</em></Link></li>)}</ol>
               </div>
               <div className="rank-panel">
                 <div className="rank-panel__heading"><span>↻</span><div><h2>{text(lang, "最近更新", "Recently pushed")}</h2><p>{text(lang, "维护活跃度", "Maintenance activity")}</p></div></div>
-                <ol>{topFresh.map((plugin, index) => <li key={plugin.id}><Link href={pluginPath(plugin)} prefetch={false} onClick={(event) => openInDrawer(event, () => openPlugin(plugin))}><b>{String(index + 1).padStart(2, "0")}</b><span><strong>{plugin.name}</strong><small>{plugin.owner}</small></span><em>{relativeDate(plugin.pushedAt, lang)}</em></Link></li>)}</ol>
+                <ol>{topFresh.map((plugin, index) => <li key={plugin.id}><Link href={pluginPath(plugin)} prefetch={false} onClick={(event) => openInDrawer(event, () => openPlugin(plugin))}><b>{String(index + 1).padStart(2, "0")}</b><span><strong>{visiblePluginName(plugin)}</strong><small>{plugin.repo}</small></span><em>{relativeDate(plugin.pushedAt, lang)}</em></Link></li>)}</ol>
               </div>
             </div>
           </section>

@@ -31,7 +31,7 @@ export interface PluginScreening {
   checkedAt: string;
   findings: Array<{
     id: string;
-    severity: "medium" | "high";
+    severity: "info" | "medium" | "high";
     label: Record<Language, string>;
     files: string[];
   }>;

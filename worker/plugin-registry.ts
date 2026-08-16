@@ -17,6 +17,7 @@ import {
   manifestSummary,
   normalizeRepositoryPath,
   repositoryRootFiles,
+  inspectionQueuePriority,
   resolveRegistryScanLimit,
   sanitizePublicScanError,
   sanitizeRegistryInstallEvidence,
@@ -628,7 +629,20 @@ async function syncPluginRegistryUnlocked(env: PluginRegistryEnv) {
   const staleExisting = registry.plugins
     .filter((plugin) => shouldRescan(plugin, state) && !discovered.has(plugin.id))
     .map(metadataFromPlugin);
-  const candidates = [...newOrChanged, ...staleExisting].slice(0, scanLimit(env));
+  const queued = new Map<string, GithubRepository>();
+  for (const meta of [...newOrChanged, ...staleExisting]) {
+    const id = meta.full_name.toLowerCase();
+    if (!queued.has(id)) queued.set(id, meta);
+  }
+  const candidates = [...queued.values()]
+    .sort((a, b) => {
+      const previousA = previousById.get(a.full_name.toLowerCase());
+      const previousB = previousById.get(b.full_name.toLowerCase());
+      return inspectionQueuePriority(previousA) - inspectionQueuePriority(previousB)
+        || Number(Boolean(previousB?.curated)) - Number(Boolean(previousA?.curated))
+        || (b.stargazers_count || 0) - (a.stargazers_count || 0);
+    })
+    .slice(0, scanLimit(env));
   const discoveredThisRun = [...discovered.keys()].filter((id) => !previousById.has(id)).length;
 
   const results = await mapLimit(candidates, 2, async (meta) => {
