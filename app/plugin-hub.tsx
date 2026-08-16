@@ -6,6 +6,7 @@ import type {
   PluginRecord,
   PluginRegistryData,
 } from "@/lib/plugin-data";
+import { comparePluginsByEvidence, suggestedInstallCommand } from "@/lib/plugin-screening.mjs";
 import Link from "next/link";
 import { type FormEvent, type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -87,21 +88,7 @@ function pageFromLocation(): PageId {
   return PAGES.some((page) => page.id === first) ? (first as PageId) : "home";
 }
 
-function suggestedInstallCommand(plugin: PluginRecord) {
-  return `dsh plugin --profile web add github:${plugin.repo}`;
-}
 
-function evidenceScore(plugin: PluginRecord) {
-  let score = 0;
-  if (plugin.screening.state === "clear") score += 400;
-  else if (plugin.screening.state === "review") score += 200;
-  else if (plugin.screening.state === "pending") score += 80;
-  if (plugin.manifest.state === "verified") score += 80;
-  if (plugin.curated) score += 40;
-  if (plugin.topic) score += 20;
-  score += Math.min(plugin.stars || 0, 500);
-  return score;
-}
 
 function pluginPath(plugin: PluginRecord) {
   return `/plugin/${plugin.id.split("/").map(encodeURIComponent).join("/")}`;
@@ -187,7 +174,9 @@ function PluginDetail({
           </>
         ) : (
           <>
-            <p className="warning-copy">{text(lang, "当前证据不足或风险信号需要人工复核，网站不提供已钉死 commit 的安装命令。下面只是仓库级建议命令，执行前请先核对完整源码。", "Evidence is currently insufficient or risk signals need manual review, so no commit-pinned install command is shown. The suggestion below is repository-level only; review the complete source first.")}</p>
+            <p className="warning-copy">{plugin.screenedCommit
+              ? text(lang, "静态检查尚未通过，因此不提供正式安装命令。下面是钉到已检查提交的建议命令，执行前请先核对完整源码。", "Static screening has not passed, so no official install command is shown. The suggestion below is pinned to the inspected commit; review the complete source first.")
+              : text(lang, "当前证据不足或尚未完成源码检查，网站不提供正式安装命令。下面只是仓库级建议命令，执行前请先核对完整源码。", "Evidence is currently insufficient or the source scan is still pending, so no official install command is shown. The suggestion below is repository-level only; review the complete source first.")}</p>
             <div className="code-panel code-panel--drawer">
               <code>{suggested}</code>
               <button type="button" onClick={() => onCopy(suggested, plugin.id)}>{copied ? text(lang, "已复制", "Copied") : text(lang, "复制", "Copy")}</button>
@@ -249,7 +238,7 @@ function PluginCard({
               {sourceLabel(plugin)}
             </span>
           </span>
-          <span className="plugin-card__owner">{plugin.owner}</span>
+          <span className="plugin-card__owner">{plugin.repo}</span>
           <span className="plugin-card__description">{plugin.description[lang]}</span>
           <span className="plugin-card__meta">
             <span>★ {formatNumber(plugin.stars, lang)}</span>
@@ -514,7 +503,7 @@ export function PluginHub({
       if (sort === "added") return (b.added || "").localeCompare(a.added || "") || a.order - b.order;
       if (sort === "name") return a.name.localeCompare(b.name);
       if (sort === "curated") return a.order - b.order;
-      return evidenceScore(b) - evidenceScore(a) || a.order - b.order;
+      return comparePluginsByEvidence(a, b);
     });
   }, [category, data.categories, data.plugins, evidence, favorites, query, sort]);
 

@@ -3,13 +3,16 @@ import test from "node:test";
 import {
   categoryFromText,
   classifyInspectionFailure,
+  comparePluginsByEvidence,
   markInspectionUnavailable,
   manifestSummary,
   normalizeRepositoryPath,
   repositoryRootFiles,
+  resolveRegistryScanLimit,
   sanitizePublicScanError,
   sanitizeRegistryInstallEvidence,
   screenRepository,
+  suggestedInstallCommand,
 } from "../lib/plugin-screening.mjs";
 
 test("classifies deterministic oversized inspections for long backoff", () => {
@@ -24,6 +27,33 @@ test("treats empty GitHub repositories as uninspectable instead of scan-degradin
   assert.equal(classifyInspectionFailure("Git Repository is empty."), "uninspectable");
   assert.doesNotMatch(sanitizePublicScanError("409 Conflict: https://api.github.com/repos/uckkk/dsh-scaffold/commits/main"), /github\.com|uckkk/u);
   assert.match(sanitizePublicScanError("409 Conflict: https://api.github.com/repos/uckkk/dsh-scaffold/commits/main"), /empty|default branch/u);
+});
+
+test("ranks clear plugins ahead of popular blocked plugins", () => {
+  const blockedPopular = { screening: { state: "blocked" }, manifest: { state: "verified" }, stars: 2000, order: 1 };
+  const clearQuiet = { screening: { state: "clear" }, manifest: { state: "verified" }, stars: 3, order: 9 };
+  const review = { screening: { state: "review" }, manifest: { state: "verified" }, stars: 800, order: 2 };
+  const ranked = [blockedPopular, review, clearQuiet].sort(comparePluginsByEvidence);
+  assert.equal(ranked[0], clearQuiet);
+  assert.equal(ranked[1], review);
+  assert.equal(ranked[2], blockedPopular);
+});
+
+test("raises the default scan budget when a GitHub token is present", () => {
+  assert.equal(resolveRegistryScanLimit({}), 7);
+  assert.equal(resolveRegistryScanLimit({ token: "github-token" }), 40);
+  assert.equal(resolveRegistryScanLimit({ token: "github-token", requested: "12" }), 12);
+});
+
+test("suggests a commit-pinned command when a screened commit exists", () => {
+  assert.equal(
+    suggestedInstallCommand({ repo: "owner/plugin", screenedCommit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }),
+    "dsh plugin --profile web add github:owner/plugin#aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  );
+  assert.equal(
+    suggestedInstallCommand({ repo: "owner/plugin", screenedCommit: null }),
+    "dsh plugin --profile web add github:owner/plugin",
+  );
 });
 
 const safeMeta = {

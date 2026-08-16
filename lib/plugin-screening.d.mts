@@ -1,6 +1,9 @@
 export const SCREENING_VERSION: number;
 export function classifyInspectionFailure(value: unknown): "uninspectable" | "transient";
 export function sanitizePublicScanError(value: unknown): string;
+export function comparePluginsByEvidence(a: unknown, b: unknown): number;
+export function resolveRegistryScanLimit(input?: { token?: string; requested?: string | number }): number;
+export function suggestedInstallCommand(plugin: { repo?: string; screenedCommit?: string | null }): string;
 
 export interface ScreeningManifest {
   state: "verified" | "package-only" | "missing" | "invalid" | "error";

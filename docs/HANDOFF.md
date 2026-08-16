@@ -31,5 +31,4 @@ Build/TypeScript、Lint、26 项测试、`npm audit --omit=dev`、差异格式�
 
 ## 下一步
 
-- 给 `www.apiu.cc` 增加指向 `47.76.25.43` 的 A 记录后，再执行 `certbot --nginx -d apiu.cc -d www.apiu.cc --expand`，HTTPS www 才会有合法证书。
-- 保持每 30 分钟自动同步，并在 2026-11-13 前轮换 `GITHUB_TOKEN`。
+保持每 30 分钟自动同步，并在 2026-11-13 前轮换 `GITHUB_TOKEN`。站点域名维持 `apiu.cc`，不启用 www 前缀。

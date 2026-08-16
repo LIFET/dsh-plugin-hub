@@ -17,6 +17,7 @@ import {
   manifestSummary,
   normalizeRepositoryPath,
   repositoryRootFiles,
+  resolveRegistryScanLimit,
   sanitizePublicScanError,
   sanitizeRegistryInstallEvidence,
   screenRepository,
@@ -25,7 +26,6 @@ import {
 const STORE_FILENAME = "plugin-registry-store.json";
 const LOCK_FILENAME = "plugin-registry-sync.lock";
 const LOCK_STALE_MS = 25 * 60 * 1_000;
-const MAX_SCANS_PER_RUN = 7;
 const MAX_SEARCH_PAGE = 10;
 const RESCAN_AFTER_MS = 7 * 24 * 60 * 60 * 1_000;
 const MAX_JSON_BYTES = 6_000_000;
@@ -516,11 +516,10 @@ function normalizeDescription(value: string) {
 }
 
 function scanLimit(env: PluginRegistryEnv) {
-  // Two search calls plus two API calls per scan keep seven anonymous scans
-  // below GitHub's 60-request hourly allowance, including public preflights.
-  const defaultLimit = MAX_SCANS_PER_RUN;
-  const parsed = Number(env.REGISTRY_SCAN_LIMIT || defaultLimit);
-  return Number.isInteger(parsed) ? Math.min(50, Math.max(1, parsed)) : MAX_SCANS_PER_RUN;
+  return resolveRegistryScanLimit({
+    token: env.GITHUB_TOKEN,
+    requested: env.REGISTRY_SCAN_LIMIT,
+  });
 }
 
 async function mapLimit<T, R>(items: T[], limit: number, mapper: (item: T) => Promise<R>) {
