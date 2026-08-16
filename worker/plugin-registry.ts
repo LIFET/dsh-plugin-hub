@@ -17,6 +17,7 @@ import {
   manifestSummary,
   normalizeRepositoryPath,
   repositoryRootFiles,
+  sanitizePublicScanError,
   sanitizeRegistryInstallEvidence,
   screenRepository,
 } from "../lib/plugin-screening.mjs";
@@ -591,7 +592,7 @@ async function syncPluginRegistryUnlocked(env: PluginRegistryEnv) {
     pageOne = await searchTopicPage(1, env);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    registry.automation = { ...registry.automation, state: "degraded", lastRunAt: now, error: message };
+    registry.automation = { ...registry.automation, state: "degraded", lastRunAt: now, error: sanitizePublicScanError(message) };
     await writeRuntimeStore(env, { registry, state });
     console.error(JSON.stringify({ event: "registry.sync.error", stage: "discovery", error: message }));
     return registry;
@@ -700,7 +701,7 @@ async function syncPluginRegistryUnlocked(env: PluginRegistryEnv) {
     state: errors.length ? "partial" : "live",
     total: pageOne.total_count || registry.sources.topic.total,
     scanned: Object.keys(state.seen).length,
-    error: errors.length ? errors.slice(0, 3).join(" | ") : null,
+    error: errors.length ? sanitizePublicScanError(errors[0]) : null,
   };
   registry.automation = {
     enabled: true,
@@ -713,7 +714,7 @@ async function syncPluginRegistryUnlocked(env: PluginRegistryEnv) {
     discoveredThisRun,
     admittedThisRun,
     rejectedTotal: Object.values(state.seen).filter((item) => ["rejected", "blocked"].includes(item.outcome)).length,
-    error: errors.length ? errors.slice(0, 3).join(" | ") : null,
+    error: errors.length ? sanitizePublicScanError(errors[0]) : null,
   };
   summarize(registry);
 

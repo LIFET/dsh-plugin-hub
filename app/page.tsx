@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import type { CategoryId, PluginRegistryData } from "@/lib/plugin-data";
 import { readPluginRegistryWithSource } from "@/worker/plugin-registry";
+import { jsonLdScript } from "./json-ld";
 import { PluginHub } from "./plugin-hub";
 
 export const dynamic = "force-dynamic";
@@ -36,5 +37,22 @@ export default async function Home() {
     .sort((a, b) => (b.stars || 0) - (a.stars || 0))
     .slice(0, 6);
   const data: PluginRegistryData = { ...registry, plugins: featured };
-  return <PluginHub data={data} initialSource={source === "node-file" ? "live" : "bundled"} initialLanguage={initialLanguage} initialTheme={initialTheme} initialCategoryCounts={categoryCounts} initialInspectedCount={inspectedCount} />;
+  const siteName = initialLanguage === "en" ? "DSH Plugin Hub" : "DSH 插件资源站";
+  return (
+    <>
+      {jsonLdScript({
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        name: siteName,
+        url: "https://apiu.cc/",
+        inLanguage: initialLanguage === "en" ? "en" : "zh-CN",
+        potentialAction: {
+          "@type": "SearchAction",
+          target: "https://apiu.cc/plugins?q={search_term_string}",
+          "query-input": "required name=search_term_string",
+        },
+      })}
+      <PluginHub data={data} initialSource={source === "node-file" ? "live" : "bundled"} initialLanguage={initialLanguage} initialTheme={initialTheme} initialCategoryCounts={categoryCounts} initialInspectedCount={inspectedCount} />
+    </>
+  );
 }

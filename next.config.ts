@@ -31,6 +31,18 @@ const nextConfig: NextConfig = {
           { key: "X-Frame-Options", value: "DENY" },
         ],
       },
+      {
+        source: "/",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=0, s-maxage=120, stale-while-revalidate=600" },
+        ],
+      },
+      {
+        source: "/((?!api/).*)",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=0, s-maxage=120, stale-while-revalidate=600" },
+        ],
+      },
     ];
   },
 };

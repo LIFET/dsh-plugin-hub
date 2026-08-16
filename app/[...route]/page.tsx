@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { cache } from "react";
-import type { PluginRegistryData } from "@/lib/plugin-data";
+import type { PluginRecord, PluginRegistryData } from "@/lib/plugin-data";
 import { readPluginRegistryWithSource } from "@/worker/plugin-registry";
 import { PluginHub } from "../plugin-hub";
+import { jsonLdScript } from "../json-ld";
 
 export const dynamic = "force-dynamic";
 
@@ -71,8 +72,15 @@ export default async function RoutedHub({ params }: Props) {
   const { registry: data, source } = await registry();
   if (route[0] === "plugin" && route.length === 3) {
     const id = `${route[1]}/${route[2]}`.toLowerCase();
-    if (!data.plugins.some((plugin) => plugin.id === id)) notFound();
-    return <PluginHub data={data} initialPage="catalog" initialPluginId={id} initialSource={source === "node-file" ? "live" : "bundled"} initialLanguage={initialLanguage} initialTheme={initialTheme} />;
+    const plugin = data.plugins.find((item) => item.id === id);
+    if (!plugin) notFound();
+    const slim: PluginRegistryData = { ...data, plugins: [plugin] };
+    return (
+      <>
+        {jsonLdScript(pluginJsonLd(plugin, initialLanguage))}
+        <PluginHub data={slim} initialPage="plugin" initialPluginId={id} initialSource={source === "node-file" ? "live" : "bundled"} initialLanguage={initialLanguage} initialTheme={initialTheme} />
+      </>
+    );
   }
   const details = pageDetails[route[0] as keyof typeof pageDetails];
   if (!details || route.length !== 1) notFound();
@@ -82,4 +90,21 @@ export default async function RoutedHub({ params }: Props) {
       ? rankingData(data)
       : { ...data, plugins: [] };
   return <PluginHub data={projected} initialPage={details.page} initialSource={source === "node-file" ? "live" : "bundled"} initialLanguage={initialLanguage} initialTheme={initialTheme} />;
+}
+
+function pluginJsonLd(plugin: PluginRecord, lang: "zh" | "en") {
+  return {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: plugin.name,
+    alternateName: plugin.repo,
+    description: plugin.description[lang] || plugin.description.zh || plugin.description.en,
+    url: `https://apiu.cc/plugin/${plugin.id.split("/").map(encodeURIComponent).join("/")}`,
+    applicationCategory: "DeveloperApplication",
+    operatingSystem: "Cross-platform",
+    installUrl: plugin.url,
+    codeRepository: plugin.url,
+    author: { "@type": "Person", name: plugin.owner },
+    offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+  };
 }

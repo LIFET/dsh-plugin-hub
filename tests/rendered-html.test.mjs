@@ -102,6 +102,10 @@ test("server-renders the complete plugin hub", async () => {
   assert.match(html, /作者：岚叔/);
   assert.match(html, /JSON API/);
   assert.match(html, /href="\/plugins"/);
+  assert.match(html, /<form[^>]+(?:class="hero-search"|action="\/plugins")/u);
+  assert.match(html, /application\/ld\+json/u);
+  assert.match(html, /theme-color/u);
+  assert.match(html, /site\.webmanifest|rel="manifest"/u);
   assert.ok(Buffer.byteLength(html) < 180_000, `home payload is ${Buffer.byteLength(html)} bytes`);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton|Your site is taking shape/i);
 });
@@ -124,8 +128,13 @@ test("serves shareable pages and plugin detail metadata", async () => {
   assert.equal(response.status, 200);
   const html = await response.text();
   assert.match(html, new RegExp(`<title>${plugin.name.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}`));
-  assert.match(html, /role="dialog"/);
+  assert.match(html, new RegExp(`<h1[^>]*>${plugin.name.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}`));
+  assert.doesNotMatch(html, /role="dialog"/);
+  assert.doesNotMatch(html, /<h1[^>]*>插件目录/u);
+  assert.match(html, /application\/ld\+json/u);
+  assert.match(html, /SoftwareApplication/u);
   assert.match(html, new RegExp(`rel="canonical" href="https://apiu.cc/plugin/${plugin.id}`));
+  assert.ok(Buffer.byteLength(html) < 220_000, `plugin payload is ${Buffer.byteLength(html)} bytes`);
 });
 
 test("server-renders saved language and theme preferences", async () => {
@@ -209,7 +218,9 @@ test("rejects an oversized chunked preflight body", async () => {
 test("serves crawl metadata and a branded not-found page", async () => {
   const robots = await request("/robots.txt", "text/plain");
   assert.equal(robots.status, 200);
-  assert.match(await robots.text(), /Sitemap: https:\/\/apiu\.cc\/sitemap\.xml/u);
+  const robotsText = await robots.text();
+  assert.match(robotsText, /Sitemap: https:\/\/apiu\.cc\/sitemap\.xml/u);
+  assert.doesNotMatch(robotsText, /^Host:/mu);
 
   const sitemap = await request("/sitemap.xml", "application/xml");
   assert.equal(sitemap.status, 200);

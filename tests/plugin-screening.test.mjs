@@ -7,6 +7,7 @@ import {
   manifestSummary,
   normalizeRepositoryPath,
   repositoryRootFiles,
+  sanitizePublicScanError,
   sanitizeRegistryInstallEvidence,
   screenRepository,
 } from "../lib/plugin-screening.mjs";
@@ -16,6 +17,13 @@ test("classifies deterministic oversized inspections for long backoff", () => {
   assert.equal(classifyInspectionFailure("Response too large (400000 bytes): https://example.test/commit"), "uninspectable");
   assert.equal(classifyInspectionFailure("403 rate limit reached"), "transient");
   assert.equal(classifyInspectionFailure("network timeout"), "transient");
+});
+
+test("treats empty GitHub repositories as uninspectable instead of scan-degrading", () => {
+  assert.equal(classifyInspectionFailure("409 Conflict: https://api.github.com/repos/uckkk/dsh-scaffold/commits/main"), "uninspectable");
+  assert.equal(classifyInspectionFailure("Git Repository is empty."), "uninspectable");
+  assert.doesNotMatch(sanitizePublicScanError("409 Conflict: https://api.github.com/repos/uckkk/dsh-scaffold/commits/main"), /github\.com|uckkk/u);
+  assert.match(sanitizePublicScanError("409 Conflict: https://api.github.com/repos/uckkk/dsh-scaffold/commits/main"), /empty|default branch/u);
 });
 
 const safeMeta = {

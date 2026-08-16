@@ -1,0 +1,18 @@
+{
+  "name": "DSH Plugin Hub",
+  "short_name": "DSH Hub",
+  "description": "DeepSeek Harness community plugin index",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f6f7fa",
+  "theme_color": "#3d46d8",
+  "lang": "zh-CN",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any"
+    }
+  ]
+}

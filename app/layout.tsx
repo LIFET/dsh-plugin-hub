@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { cookies } from "next/headers";
 import "./globals.css";
 
@@ -12,6 +12,14 @@ const sharedMetadata: Metadata = {
       icon: [{ url: "/favicon.svg", type: "image/svg+xml", sizes: "any" }],
       shortcut: "/favicon.svg",
     },
+    manifest: "/site.webmanifest",
+};
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f6f7fa" },
+    { media: "(prefers-color-scheme: dark)", color: "#0d0f13" },
+  ],
 };
 
 export async function generateMetadata(): Promise<Metadata> {
