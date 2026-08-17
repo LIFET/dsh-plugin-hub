@@ -16,6 +16,8 @@ import {
   selectRelatedPlugins,
   normalizeOwnerParam,
   catalogPageTitle,
+  selectRecentPlugins,
+  normalizeRepositoryUrl,
   suggestedInstallCommand,
   displayInstallCommand,
   matchesSearchQuery,
@@ -93,6 +95,21 @@ test("builds catalog titles from search, owner, and category", () => {
     categories: { memory: { zh: "记忆", en: "Memory" } },
     fallback: "插件目录",
   }), "记忆");
+});
+
+test("selects recently added plugins without blocked entries", () => {
+  const recent = selectRecentPlugins([
+    { name: "old", added: "2026-01-01", screening: { state: "clear" } },
+    { name: "blocked-new", added: "2026-08-17", screening: { state: "blocked" } },
+    { name: "fresh", added: "2026-08-16", screening: { state: "clear" } },
+  ], 2);
+  assert.deepEqual(recent.map((plugin) => plugin.name), ["fresh", "old"]);
+});
+
+test("accepts only public GitHub repository URLs", () => {
+  assert.equal(normalizeRepositoryUrl("https://github.com/Owner/Plugin.git"), "https://github.com/Owner/Plugin");
+  assert.equal(normalizeRepositoryUrl("https://example.com/owner/plugin"), "");
+  assert.equal(normalizeRepositoryUrl("https://github.com/owner/plugin/issues"), "");
 });
 
 test("picks related plugins from the same category", () => {

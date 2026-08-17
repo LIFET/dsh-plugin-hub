@@ -576,21 +576,32 @@ html:not([data-theme="dark"]) .hub[data-theme="light"] {
 
 .featured-card {
   position: relative;
-  display: flex;
-  min-height: 280px;
-  flex-direction: column;
-  padding: 28px;
   overflow: hidden;
   border-right: 1px solid var(--line) !important;
   border-bottom: 1px solid var(--line) !important;
   background: var(--surface);
   text-align: left;
-  text-decoration: none;
   transition: background 160ms ease;
 }
 
 .featured-card:hover {
   background: var(--surface-2);
+}
+
+.featured-card__main {
+  display: flex;
+  min-height: 280px;
+  flex-direction: column;
+  padding: 28px;
+  background: transparent;
+  text-decoration: none;
+}
+
+.featured-card > .copy-install {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 2;
 }
 
 .featured-card__rank {
@@ -1289,6 +1300,10 @@ main > .page-section {
   border-bottom: 1px solid var(--line);
 }
 
+.rank-panel__heading .text-button {
+  margin-left: auto;
+}
+
 .rank-panel__heading > span {
   display: grid;
   width: 42px;
@@ -1320,6 +1335,10 @@ main > .page-section {
   list-style: none;
 }
 
+.rank-panel li {
+  position: relative;
+}
+
 .rank-panel li + li {
   border-top: 1px solid var(--line);
 }
@@ -1330,10 +1349,18 @@ main > .page-section {
   grid-template-columns: 40px minmax(0, 1fr) auto auto;
   gap: 12px;
   align-items: center;
-  padding: 15px 18px;
+  padding: 15px 52px 15px 18px;
   background: transparent;
   text-align: left;
   text-decoration: none;
+}
+
+.rank-panel li .copy-install {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  z-index: 1;
+  transform: translateY(-50%);
 }
 
 .rank-panel li a:hover {
@@ -1675,6 +1702,79 @@ html:not([data-theme="dark"]) .hub[data-theme="light"] .code-panel {
   color: var(--muted-2);
   font-family: var(--font-mono);
   font-size: 11px;
+}
+
+.plugin-crumbs a,
+.plugin-page__top a {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+}
+
+.check-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.check-pills li {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  gap: 5px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 11px;
+}
+
+.check-pills .is-on {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.check-pills .is-off {
+  background: var(--surface-2);
+  color: var(--muted-2);
+}
+
+.plugin-pager {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 22px 0 0;
+}
+
+.plugin-pager a,
+.plugin-pager > span {
+  display: grid;
+  gap: 2px;
+  min-height: 64px;
+  align-content: center;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  text-decoration: none;
+}
+
+.plugin-pager a:last-child {
+  text-align: right;
+}
+
+.plugin-pager small {
+  color: var(--muted-2);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.plugin-pager strong {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .related-list {
@@ -2137,6 +2237,17 @@ html:not([data-theme="dark"]) .hub[data-theme="light"] .code-panel {
 
   .plugin-card__number {
     display: none;
+  }
+
+  .copy-install,
+  .favorite-button {
+    width: 44px;
+    height: 44px;
+  }
+
+  .plugin-crumbs a,
+  .plugin-page__top a {
+    min-height: 44px;
   }
 
   .guide-grid article {

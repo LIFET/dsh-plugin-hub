@@ -13,6 +13,8 @@ export function displayDescription(plugin: { description?: { zh?: string; en?: s
 export function selectFeaturedPlugins<T>(plugins: T[], limit?: number): T[];
 export function selectRelatedPlugins<T>(plugins: T[], current: T | null | undefined, limit?: number): T[];
 export function normalizeOwnerParam(value: unknown): string;
+export function selectRecentPlugins<T>(plugins: T[], limit?: number): T[];
+export function normalizeRepositoryUrl(value: unknown): string;
 export function catalogPageTitle(input?: {
   query?: string;
   category?: string;

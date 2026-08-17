@@ -119,6 +119,7 @@ test("serves shareable pages and plugin detail metadata", async () => {
     ["/rank", "排行榜"],
     ["/submit", "让你的插件被看见"],
     ["/guide", "从一个可检查的插件开始"],
+    ["/submit?url=https://github.com/owner/plugin", "https://github.com/owner/plugin"],
   ]) {
     const response = await request(path);
     assert.equal(response.status, 200, path);

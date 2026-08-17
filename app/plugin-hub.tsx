@@ -141,6 +141,19 @@ function sourceClass(plugin: PluginRecord) {
   return plugin.topic ? "topic" : "list";
 }
 
+function pluginInstallCommand(plugin: PluginRecord) {
+  return withPackageRunner(displayInstallCommand(plugin.installCommand || suggestedInstallCommand(plugin), "web"), "dsh");
+}
+
+const CHECK_ITEMS = [
+  ["manifest", "Manifest", "Manifest"],
+  ["license", "许可证", "License"],
+  ["readme", "README", "README"],
+  ["lockfile", "锁文件", "Lockfile"],
+  ["source", "源码检查", "Source"],
+  ["securityDisclosure", "安全说明", "Security note"],
+] as const;
+
 function highlightMatch(value: string, query: string) {
   const needle = query.trim().split(/\s+/u)[0] || "";
   if (!needle) return value;
@@ -162,6 +175,8 @@ function PluginDetail({
   favorite,
   copied,
   related,
+  previous,
+  next,
   catalogHref,
   onCopy,
   onFavorite,
@@ -174,6 +189,8 @@ function PluginDetail({
   favorite: boolean;
   copied: string | null;
   related: PluginRecord[];
+  previous: PluginRecord | null;
+  next: PluginRecord | null;
   catalogHref: string;
   onCopy: (value: string, id: string) => void;
   onFavorite: () => void;
@@ -212,6 +229,14 @@ function PluginDetail({
         <span>{plugin.language || text(lang, "语言未知", "Language unknown")}</span>
       </div>
       <p className="drawer-description" id="plugin-description">{displayDescription(plugin, lang)}</p>
+      <ul className="check-pills" aria-label={text(lang, "检查项", "Checklist")}>
+        {CHECK_ITEMS.map(([id, zh, en]) => (
+          <li key={id} className={plugin.screening.checks[id] ? "is-on" : "is-off"}>
+            <span aria-hidden="true">{plugin.screening.checks[id] ? "✓" : "–"}</span>
+            {text(lang, zh, en)}
+          </li>
+        ))}
+      </ul>
 
       <div className="drawer-section">
         <span className="drawer-label">{text(lang, "安装证据", "INSTALL EVIDENCE")}</span>
@@ -264,6 +289,28 @@ function PluginDetail({
         <button className={`secondary-button ${favorite ? "is-active" : ""}`} type="button" onClick={onFavorite}>★ {text(lang, favorite ? "已收藏" : "收藏", favorite ? "Saved" : "Save")}</button>
         <button className="secondary-button" type="button" onClick={onShare}>{copied === `${plugin.id}-link` ? text(lang, "链接已复制", "Link copied") : text(lang, "分享链接", "Share link")}</button>
       </div>
+      {(previous || next) && (
+        <nav className="plugin-pager" aria-label={text(lang, "相邻插件", "Adjacent plugins")}>
+          {previous ? (
+            <Link href={pluginPath(previous)} prefetch={false} onClick={(event) => {
+              if (!onOpenRelated) return;
+              openInDrawer(event, () => onOpenRelated(previous));
+            }}>
+              <small>{text(lang, "上一个", "Previous")}</small>
+              <strong>{visiblePluginName(previous)}</strong>
+            </Link>
+          ) : <span />}
+          {next ? (
+            <Link href={pluginPath(next)} prefetch={false} onClick={(event) => {
+              if (!onOpenRelated) return;
+              openInDrawer(event, () => onOpenRelated(next));
+            }}>
+              <small>{text(lang, "下一个", "Next")}</small>
+              <strong>{visiblePluginName(next)}</strong>
+            </Link>
+          ) : <span />}
+        </nav>
+      )}
       {related.length > 0 && (
         <div className="drawer-section">
           <span className="drawer-label">{text(lang, "同类插件", "RELATED PLUGINS")}</span>
@@ -309,7 +356,7 @@ function PluginCard({
   view: "list" | "cards";
   query: string;
 }) {
-  const command = withPackageRunner(displayInstallCommand(plugin.installCommand || suggestedInstallCommand(plugin), "web"), "dsh");
+  const command = pluginInstallCommand(plugin);
   const copyId = `${plugin.id}-card`;
   return (
     <article className={`plugin-card plugin-card--${view}`}>
@@ -372,6 +419,7 @@ export function PluginHub({
   initialEvidence = "all",
   initialSort = "evidence",
   initialOwner = "",
+  initialRepositoryUrl = "",
 }: {
   data: PluginRegistryData;
   initialPage?: PageId;
@@ -387,6 +435,7 @@ export function PluginHub({
   initialEvidence?: EvidenceFilter;
   initialSort?: SortId;
   initialOwner?: string;
+  initialRepositoryUrl?: string;
 }) {
   const data = initialData;
   const [registrySource] = useState<"bundled" | "live">(initialSource);
@@ -414,7 +463,7 @@ export function PluginHub({
   ));
   const [copied, setCopied] = useState<string | null>(null);
   const [copyMessage, setCopyMessage] = useState("");
-  const [repositoryUrl, setRepositoryUrl] = useState("");
+  const [repositoryUrl, setRepositoryUrl] = useState(initialRepositoryUrl);
   const [preflight, setPreflight] = useState<null | {
     loading?: boolean;
     error?: string;
@@ -600,14 +649,13 @@ export function PluginHub({
     }
   }, [lang]);
 
-  const checkRepository = useCallback(async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const runPreflight = useCallback(async (url: string) => {
     setPreflight({ loading: true });
     try {
       const response = await fetch("/api/repository/check", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: repositoryUrl }),
+        body: JSON.stringify({ url }),
       });
       const result = await response.json() as { error?: string; repo?: string; topic?: boolean; manifest?: string; eligible?: boolean; listedId?: string | null };
       if (!response.ok) throw new Error(result.error || text(lang, "检查失败", "Check failed"));
@@ -615,7 +663,12 @@ export function PluginHub({
     } catch (error) {
       setPreflight({ error: error instanceof Error ? error.message : text(lang, "检查失败", "Check failed") });
     }
-  }, [lang, repositoryUrl]);
+  }, [lang]);
+
+  const checkRepository = useCallback(async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    await runPreflight(repositoryUrl);
+  }, [repositoryUrl, runPreflight]);
 
   const preCategory = useMemo(() => {
     const favoriteSet = new Set(favorites);
@@ -823,6 +876,33 @@ export function PluginHub({
     [data.plugins],
   );
   const featured = page === "home" ? data.plugins.slice(0, 6) : topStars.slice(0, 6);
+  const newcomers = page === "home" ? data.plugins.slice(6) : [];
+
+  const browseList = page === "catalog" ? filtered : page === "rank" ? data.plugins : selected ? [selected, ...relatedPlugins.filter((plugin) => plugin.id !== selected.id)] : [];
+  const selectedIndex = selected ? browseList.findIndex((plugin) => plugin.id === selected.id) : -1;
+  const previousPlugin = selectedIndex > 0 ? browseList[selectedIndex - 1] : null;
+  const nextPlugin = selectedIndex >= 0 && selectedIndex < browseList.length - 1 ? browseList[selectedIndex + 1] : null;
+
+  useEffect(() => {
+    if (!selected || page === "plugin") return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "ArrowLeft" && previousPlugin) {
+        event.preventDefault();
+        openPlugin(previousPlugin);
+      }
+      if (event.key === "ArrowRight" && nextPlugin) {
+        event.preventDefault();
+        openPlugin(nextPlugin);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [nextPlugin, openPlugin, page, previousPlugin, selected]);
+
+  useEffect(() => {
+    if (page !== "submit" || !initialRepositoryUrl) return;
+    void runPreflight(initialRepositoryUrl);
+  }, [initialRepositoryUrl, page, runPreflight]);
   const generatedLabel = data.generatedAt.slice(0, 16).replace("T", " ") + " UTC";
   const automationLabel = data.automation.state === "live"
     ? text(lang, "自动同步正常", "Automated sync healthy")
@@ -940,17 +1020,46 @@ export function PluginHub({
               </div>
               <div className="featured-grid">
                 {featured.map((plugin, index) => (
-                  <Link className="featured-card" href={pluginPath(plugin)} prefetch={false} key={plugin.id} onClick={(event) => openInDrawer(event, () => openPlugin(plugin))}>
-                    <span className="featured-card__rank">0{index + 1}</span>
-                    <span className="featured-card__head"><strong>{visiblePluginName(plugin)}</strong><em>★ {formatNumber(plugin.stars, lang)}</em></span>
-                    <span className="featured-card__owner">{plugin.repo}</span>
-                    <span className={`signal signal--${plugin.attention.level}`}>{signalLabel(plugin, lang)}</span>
-                    <span className="featured-card__desc">{displayDescription(plugin, lang)}</span>
-                    <span className="featured-card__foot">{data.categories[plugin.category][lang]} <i>→</i></span>
-                  </Link>
+                  <article className="featured-card" key={plugin.id}>
+                    <Link className="featured-card__main" href={pluginPath(plugin)} prefetch={false} onClick={(event) => openInDrawer(event, () => openPlugin(plugin))}>
+                      <span className="featured-card__rank">0{index + 1}</span>
+                      <span className="featured-card__head"><strong>{visiblePluginName(plugin)}</strong><em>★ {formatNumber(plugin.stars, lang)}</em></span>
+                      <span className="featured-card__owner">{plugin.repo}</span>
+                      <span className={`signal signal--${plugin.attention.level}`}>{signalLabel(plugin, lang)}</span>
+                      <span className="featured-card__desc">{displayDescription(plugin, lang)}</span>
+                      <span className="featured-card__foot">{data.categories[plugin.category][lang]} <i>→</i></span>
+                    </Link>
+                    <button
+                      className="copy-install"
+                      type="button"
+                      onClick={() => copy(pluginInstallCommand(plugin), `${plugin.id}-home`)}
+                      aria-label={text(lang, "复制安装命令", "Copy install command")}
+                    >
+                      {copied === `${plugin.id}-home` ? "✓" : "⎘"}
+                    </button>
+                  </article>
                 ))}
               </div>
             </section>
+
+            {newcomers.length > 0 && (
+              <section className="section shell">
+                <div className="section-heading">
+                  <div><span className="section-kicker">JUST IN</span><h2>{text(lang, "最近收录", "Newly listed")}</h2></div>
+                  <Link className="text-button" href="/plugins?sort=added" prefetch={false}>{text(lang, "按收录时间看", "Browse by added")} →</Link>
+                </div>
+                <ul className="recent-list">
+                  {newcomers.map((plugin) => (
+                    <li key={plugin.id}>
+                      <Link href={pluginPath(plugin)} prefetch={false} onClick={(event) => openInDrawer(event, () => openPlugin(plugin))}>
+                        <strong>{visiblePluginName(plugin)}</strong>
+                        <small>{plugin.repo} · {relativeDate(plugin.added, lang)}</small>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
 
             {recent.length > 0 && (
               <section className="section shell recent-section">
@@ -1019,13 +1128,6 @@ export function PluginHub({
                 {copied === "catalog-link" ? text(lang, "链接已复制", "Link copied") : text(lang, "复制筛选链接", "Copy filter link")}
               </button>
             </div>
-            {recent.length > 0 && (
-              <ul className="recent-list">
-                {recent.map((item) => (
-                  <li key={item.id}><Link href={`/plugin/${item.id.split("/").map(encodeURIComponent).join("/")}`} prefetch={false}><strong>{item.name}</strong><small>{item.repo}</small></Link></li>
-                ))}
-              </ul>
-            )}
             <div className="catalog-toolbar">
               <div className="search-combo">
                 <label className="search-field">
@@ -1162,15 +1264,37 @@ export function PluginHub({
 
         {page === "rank" && (
           <section className="shell page-section">
-            <div className="page-heading"><div><span className="section-kicker">PUBLIC SIGNALS</span><h1>{text(lang, "排行榜", "Leaderboard")}</h1><p>{text(lang, "星标与推送时间来自 GitHub。它们代表关注度和活跃度，不代表安全或质量。", "Stars and push times come from GitHub. They signal attention and activity, not safety or quality.")}</p></div></div>
+            <div className="page-heading">
+              <div><span className="section-kicker">PUBLIC SIGNALS</span><h1>{text(lang, "排行榜", "Leaderboard")}</h1><p>{text(lang, "星标与推送时间来自 GitHub。它们代表关注度和活跃度，不代表安全或质量。", "Stars and push times come from GitHub. They signal attention and activity, not safety or quality.")}</p></div>
+            </div>
             <div className="rank-grid">
               <div className="rank-panel">
-                <div className="rank-panel__heading"><span>★</span><div><h2>{text(lang, "按星标", "By stars")}</h2><p>{text(lang, "社区关注度", "Community attention")}</p></div></div>
-                <ol>{topStars.map((plugin, index) => <li key={plugin.id}><Link href={pluginPath(plugin)} prefetch={false} onClick={(event) => openInDrawer(event, () => openPlugin(plugin))}><b>{String(index + 1).padStart(2, "0")}</b><span><strong>{visiblePluginName(plugin)}</strong><small>{plugin.repo}</small></span><em>★ {formatNumber(plugin.stars, lang)}</em><span className={`signal signal--${plugin.attention.level}`}>{signalLabel(plugin, lang)}</span></Link></li>)}</ol>
+                <div className="rank-panel__heading"><span>★</span><div><h2>{text(lang, "按星标", "By stars")}</h2><p>{text(lang, "社区关注度", "Community attention")}</p></div><Link className="text-button" href="/plugins?sort=stars" prefetch={false}>{text(lang, "目录中查看", "Open catalog")} →</Link></div>
+                <ol>{topStars.map((plugin, index) => (
+                  <li key={plugin.id}>
+                    <Link href={pluginPath(plugin)} prefetch={false} onClick={(event) => openInDrawer(event, () => openPlugin(plugin))}>
+                      <b>{String(index + 1).padStart(2, "0")}</b>
+                      <span><strong>{visiblePluginName(plugin)}</strong><small>{plugin.repo} · {data.categories[plugin.category][lang]}</small></span>
+                      <em>★ {formatNumber(plugin.stars, lang)}</em>
+                      <span className={`signal signal--${plugin.attention.level}`}>{signalLabel(plugin, lang)}</span>
+                    </Link>
+                    <button className="copy-install" type="button" onClick={() => copy(pluginInstallCommand(plugin), `${plugin.id}-rank`)} aria-label={text(lang, "复制安装命令", "Copy install command")}>{copied === `${plugin.id}-rank` ? "✓" : "⎘"}</button>
+                  </li>
+                ))}</ol>
               </div>
               <div className="rank-panel">
-                <div className="rank-panel__heading"><span>↻</span><div><h2>{text(lang, "最近更新", "Recently pushed")}</h2><p>{text(lang, "维护活跃度", "Maintenance activity")}</p></div></div>
-                <ol>{topFresh.map((plugin, index) => <li key={plugin.id}><Link href={pluginPath(plugin)} prefetch={false} onClick={(event) => openInDrawer(event, () => openPlugin(plugin))}><b>{String(index + 1).padStart(2, "0")}</b><span><strong>{visiblePluginName(plugin)}</strong><small>{plugin.repo}</small></span><em>{relativeDate(plugin.pushedAt, lang)}</em><span className={`signal signal--${plugin.attention.level}`}>{signalLabel(plugin, lang)}</span></Link></li>)}</ol>
+                <div className="rank-panel__heading"><span>↻</span><div><h2>{text(lang, "最近更新", "Recently pushed")}</h2><p>{text(lang, "维护活跃度", "Maintenance activity")}</p></div><Link className="text-button" href="/plugins?sort=updated" prefetch={false}>{text(lang, "目录中查看", "Open catalog")} →</Link></div>
+                <ol>{topFresh.map((plugin, index) => (
+                  <li key={plugin.id}>
+                    <Link href={pluginPath(plugin)} prefetch={false} onClick={(event) => openInDrawer(event, () => openPlugin(plugin))}>
+                      <b>{String(index + 1).padStart(2, "0")}</b>
+                      <span><strong>{visiblePluginName(plugin)}</strong><small>{plugin.repo} · {data.categories[plugin.category][lang]}</small></span>
+                      <em>{relativeDate(plugin.pushedAt, lang)}</em>
+                      <span className={`signal signal--${plugin.attention.level}`}>{signalLabel(plugin, lang)}</span>
+                    </Link>
+                    <button className="copy-install" type="button" onClick={() => copy(pluginInstallCommand(plugin), `${plugin.id}-fresh`)} aria-label={text(lang, "复制安装命令", "Copy install command")}>{copied === `${plugin.id}-fresh` ? "✓" : "⎘"}</button>
+                  </li>
+                ))}</ol>
               </div>
             </div>
           </section>
@@ -1191,7 +1315,7 @@ export function PluginHub({
               <div><span className="section-kicker">QUICK CHECK</span><h2>{text(lang, "先检查仓库是否满足收录条件", "Check listing readiness")}</h2><p>{text(lang, "这里只读取公开仓库信息和 package.json，不执行任何代码。", "This reads public repository metadata and package.json only; no code is executed.")}</p></div>
               <label><span>{text(lang, "GitHub 仓库地址", "GitHub repository URL")}</span><div><input type="url" required maxLength={300} value={repositoryUrl} onChange={(event) => setRepositoryUrl(event.target.value)} aria-label={text(lang, "GitHub 仓库地址", "GitHub repository URL")} placeholder="https://github.com/owner/repository" /><button className="primary-button" type="submit" disabled={preflight?.loading}>{preflight?.loading ? text(lang, "检查中…", "Checking…") : text(lang, "立即检查", "Check now")}</button></div></label>
               {preflight && !preflight.loading && <div className={`repository-result ${preflight.error ? "is-error" : preflight.listedId || preflight.eligible ? "is-clear" : "is-review"}`} role="status">
-                {preflight.error ? <p>{preflight.error}</p> : <><strong>{preflight.listedId ? text(lang, "这个仓库已经在目录里", "This repository is already listed") : preflight.eligible ? text(lang, "已满足自动发现条件", "Ready for automatic discovery") : text(lang, "还需要补充信息", "More information is needed")}</strong><ul><li>{text(lang, "dsh-plugin Topic", "dsh-plugin topic")}：{preflight.topic ? "✓" : "×"}</li><li>DSH manifest：{preflight.manifest === "verified" ? "✓" : preflight.manifest}</li></ul>{preflight.listedId && <p><Link href={`/plugin/${preflight.listedId.split("/").map(encodeURIComponent).join("/")}`}>{text(lang, "查看插件详情", "Open plugin page")} →</Link></p>}</>}
+                {preflight.error ? <p>{preflight.error}</p> : <><strong>{preflight.listedId ? text(lang, "这个仓库已经在目录里", "This repository is already listed") : preflight.eligible ? text(lang, "已满足自动发现条件", "Ready for automatic discovery") : text(lang, "还需要补充信息", "More information is needed")}</strong><ul><li>{text(lang, "dsh-plugin Topic", "dsh-plugin topic")}：{preflight.topic ? "✓" : "×"}</li><li>DSH manifest：{preflight.manifest === "verified" ? "✓" : preflight.manifest}</li></ul>{preflight.listedId ? <p><Link href={`/plugin/${preflight.listedId.split("/").map(encodeURIComponent).join("/")}`}>{text(lang, "查看插件详情", "Open plugin page")} →</Link></p> : !preflight.eligible ? <p><Link href="/guide">{text(lang, "查看开发指南", "Read the guide")} →</Link></p> : <p>{text(lang, "加上 topic 后，网站会在 30 分钟内自动发现。", "After the topic is added, the hub discovers it within 30 minutes.")}</p>}</>}
               </div>}
             </form>
             <div className="callout"><div><span className="section-kicker">SUBMIT</span><h2>{text(lang, "公开链路", "Public paths")}</h2></div><div className="callout__links"><a href="https://github.com/topics/dsh-plugin" target="_blank" rel="noreferrer">GitHub topic ↗</a><a href={data.sources.curated.repository} target="_blank" rel="noreferrer">awesome-dsh-plugin ↗</a></div></div>
@@ -1211,6 +1335,8 @@ export function PluginHub({
               favorite={favorites.includes(selected.id)}
               copied={copied}
               related={relatedPlugins}
+              previous={previousPlugin}
+              next={nextPlugin}
               catalogHref={catalogHref}
               onCopy={copy}
               onFavorite={() => toggleFavorite(selected.id)}
@@ -1231,8 +1357,19 @@ export function PluginHub({
                 ["05", "发布", "Publish", "提交许可证、锁文件、构建产物和可复现安装说明。", "Ship license, lockfile, build artifacts, and reproducible install steps."],
               ].map(([no, zhTitle, enTitle, zhBody, enBody]) => <article key={no}><b>{no}</b><h2>{lang === "zh" ? zhTitle : enTitle}</h2><p>{text(lang, zhBody, enBody)}</p></article>)}
             </div>
-            <div className="code-panel"><span>$</span><code>npx @deepseek-ai/dsh plugin --profile web add github:owner/repository</code><button type="button" onClick={() => copy("npx @deepseek-ai/dsh plugin --profile web add github:owner/repository", "guide")}>{copied === "guide" ? text(lang, "已复制", "Copied") : text(lang, "复制", "Copy")}</button></div>
-            <p className="fine-print">{text(lang, "命令只是格式示例。发布前请确认包内已有可加载产物，Git 安装所需的 prepare 脚本也应明确披露。", "The command is a format example. Before publishing, confirm the package contains loadable artifacts and disclose any prepare script needed by Git installs.")}</p>
+            {(() => {
+              const example = data.plugins[0];
+              const command = example ? pluginInstallCommand(example) : "npx @deepseek-ai/dsh plugin --profile web add github:owner/repository";
+              return (
+                <>
+                  <div className="code-panel"><span>$</span><code>{command}</code><button type="button" onClick={() => copy(command, "guide")}>{copied === "guide" ? text(lang, "已复制", "Copied") : text(lang, "复制", "Copy")}</button></div>
+                  <p className="fine-print">{example
+                    ? text(lang, `这是已通过检查的 ${visiblePluginName(example)} 安装命令，可直接对照格式。发布前请确认包内已有可加载产物。`, `This is the inspected install command for ${visiblePluginName(example)}. Confirm the package contains loadable artifacts before publishing.`)
+                    : text(lang, "命令只是格式示例。发布前请确认包内已有可加载产物，Git 安装所需的 prepare 脚本也应明确披露。", "The command is a format example. Before publishing, confirm the package contains loadable artifacts and disclose any prepare script needed by Git installs.")}</p>
+                  {example && <p className="fine-print"><Link href={pluginPath(example)} prefetch={false}>{text(lang, "查看这个示例插件", "Open this example plugin")} →</Link></p>}
+                </>
+              );
+            })()}
           </section>
         )}
       </main>
@@ -1255,6 +1392,8 @@ export function PluginHub({
                 favorite={favorites.includes(selected.id)}
                 copied={copied}
                 related={relatedPlugins}
+                previous={previousPlugin}
+                next={nextPlugin}
                 catalogHref={catalogHref}
                 onCopy={copy}
                 onFavorite={() => toggleFavorite(selected.id)}

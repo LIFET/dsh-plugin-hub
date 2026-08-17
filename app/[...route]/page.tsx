@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 import type { CategoryId, PluginRecord, PluginRegistryData } from "@/lib/plugin-data";
-import { catalogPageTitle, normalizeOwnerParam, selectRelatedPlugins } from "@/lib/plugin-screening.mjs";
+import { catalogPageTitle, normalizeOwnerParam, normalizeRepositoryUrl, selectFeaturedPlugins, selectRelatedPlugins } from "@/lib/plugin-screening.mjs";
 import { readPluginRegistryWithSource } from "@/worker/plugin-registry";
 import { PluginHub } from "../plugin-hub";
 import { jsonLdScript } from "../json-ld";
@@ -126,7 +126,9 @@ export default async function RoutedHub({ params, searchParams }: Props) {
     ? data
     : details.page === "rank"
       ? rankingData(data)
-      : { ...data, plugins: [] };
+      : details.page === "guide"
+        ? { ...data, plugins: selectFeaturedPlugins(data.plugins, 1) }
+        : { ...data, plugins: [] };
   return (
     <PluginHub
       data={projected}
@@ -136,6 +138,7 @@ export default async function RoutedHub({ params, searchParams }: Props) {
       initialEvidence={initialEvidence as "all" | "auto" | "topic" | "manifest" | "clear" | "review" | "favorites"}
       initialSort={initialSort as "evidence" | "curated" | "stars" | "updated" | "added" | "name"}
       initialOwner={initialOwner}
+      initialRepositoryUrl={details.page === "submit" ? normalizeRepositoryUrl(firstParam(filters.url)) : ""}
       initialSource={source === "node-file" ? "live" : "bundled"}
       initialLanguage={initialLanguage}
       initialTheme={initialTheme}
