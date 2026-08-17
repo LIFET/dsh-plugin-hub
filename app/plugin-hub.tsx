@@ -316,6 +316,10 @@ export function PluginHub({
   initialCategoryCounts,
   initialInspectedCount,
   relatedPluginIds = [],
+  initialQuery = "",
+  initialCategory = "all",
+  initialEvidence = "all",
+  initialSort = "evidence",
 }: {
   data: PluginRegistryData;
   initialPage?: PageId;
@@ -326,6 +330,10 @@ export function PluginHub({
   initialCategoryCounts?: Record<CategoryId, number>;
   initialInspectedCount?: number;
   relatedPluginIds?: string[];
+  initialQuery?: string;
+  initialCategory?: "all" | CategoryId;
+  initialEvidence?: EvidenceFilter;
+  initialSort?: SortId;
 }) {
   const data = initialData;
   const [registrySource] = useState<"bundled" | "live">(initialSource);
@@ -333,15 +341,17 @@ export function PluginHub({
   const [lang, setLang] = useState<Language>(initialLanguage);
   const [theme, setTheme] = useState<"dark" | "light">(initialTheme);
   const [preferencesReady, setPreferencesReady] = useState(false);
-  const [query, setQuery] = useState("");
-  const [category, setCategory] = useState<"all" | CategoryId>("all");
-  const [sort, setSort] = useState<SortId>("evidence");
+  const [query, setQuery] = useState(initialQuery);
+  const [category, setCategory] = useState<"all" | CategoryId>(initialCategory);
+  const [sort, setSort] = useState<SortId>(["evidence", "curated", "stars", "updated", "added", "name"].includes(initialSort) ? initialSort : "evidence");
   const [homeQuery, setHomeQuery] = useState("");
   const [catalogHref, setCatalogHref] = useState("/plugins");
   const [recent, setRecent] = useState<Array<{ id: string; name: string; repo: string }>>([]);
   const loadMoreRef = useRef<HTMLButtonElement | null>(null);
   const [view, setView] = useState<"list" | "cards">("list");
-  const [evidence, setEvidence] = useState<EvidenceFilter>("all");
+  const [evidence, setEvidence] = useState<EvidenceFilter>(
+    ["all", "auto", "topic", "manifest", "clear", "review", "favorites"].includes(initialEvidence) ? initialEvidence : "all",
+  );
   const [favorites, setFavorites] = useState<string[]>([]);
   const [selected, setSelected] = useState<PluginRecord | null>(() => (
     initialPluginId ? initialData.plugins.find((plugin) => plugin.id === initialPluginId) || null : null

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { cache } from "react";
-import type { PluginRecord, PluginRegistryData } from "@/lib/plugin-data";
+import type { CategoryId, PluginRecord, PluginRegistryData } from "@/lib/plugin-data";
 import { selectRelatedPlugins } from "@/lib/plugin-screening.mjs";
 import { readPluginRegistryWithSource } from "@/worker/plugin-registry";
 import { PluginHub } from "../plugin-hub";
@@ -10,7 +10,11 @@ import { jsonLdScript } from "../json-ld";
 
 export const dynamic = "force-dynamic";
 
-type Props = { params: Promise<{ route: string[] }> };
+type Props = { params: Promise<{ route: string[] }>; searchParams?: Promise<Record<string, string | string[] | undefined>> };
+
+function firstParam(value: string | string[] | undefined) {
+  return typeof value === "string" ? value : Array.isArray(value) ? value[0] || "" : "";
+}
 
 const pageDetails = {
   plugins: { page: "catalog" as const, zh: ["插件目录", "浏览、搜索和筛选 DeepSeek Harness 社区插件。"], en: ["Plugin catalog", "Browse, search, and filter DeepSeek Harness community plugins."] },
@@ -65,12 +69,26 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function RoutedHub({ params }: Props) {
+export default async function RoutedHub({ params, searchParams }: Props) {
   const { route } = await params;
+  const filters = searchParams ? await searchParams : {};
   const cookieStore = await cookies();
   const initialLanguage = cookieStore.get("dsh-plugin-hub-lang")?.value === "en" ? "en" : "zh";
   const initialTheme = cookieStore.get("dsh-plugin-hub-theme")?.value === "dark" ? "dark" : "light";
   const { registry: data, source } = await registry();
+  const initialQuery = firstParam(filters.q);
+  const requestedCategory = firstParam(filters.category);
+  const initialCategory = requestedCategory === "all" || ["ui", "session", "tools", "workflow", "notify", "dev", "fun"].includes(requestedCategory)
+    ? requestedCategory
+    : "all";
+  const requestedEvidence = firstParam(filters.evidence);
+  const initialEvidence = ["all", "auto", "topic", "manifest", "clear", "review", "favorites"].includes(requestedEvidence)
+    ? requestedEvidence
+    : "all";
+  const requestedSort = firstParam(filters.sort);
+  const initialSort = ["evidence", "curated", "stars", "updated", "added", "name"].includes(requestedSort)
+    ? requestedSort
+    : "evidence";
   if (route[0] === "plugin" && route.length === 3) {
     const id = `${route[1]}/${route[2]}`.toLowerCase();
     const plugin = data.plugins.find((item) => item.id === id);
@@ -91,7 +109,19 @@ export default async function RoutedHub({ params }: Props) {
     : details.page === "rank"
       ? rankingData(data)
       : { ...data, plugins: [] };
-  return <PluginHub data={projected} initialPage={details.page} initialSource={source === "node-file" ? "live" : "bundled"} initialLanguage={initialLanguage} initialTheme={initialTheme} />;
+  return (
+    <PluginHub
+      data={projected}
+      initialPage={details.page}
+      initialQuery={initialQuery}
+      initialCategory={initialCategory as "all" | CategoryId}
+      initialEvidence={initialEvidence as "all" | "auto" | "topic" | "manifest" | "clear" | "review" | "favorites"}
+      initialSort={initialSort as "evidence" | "curated" | "stars" | "updated" | "added" | "name"}
+      initialSource={source === "node-file" ? "live" : "bundled"}
+      initialLanguage={initialLanguage}
+      initialTheme={initialTheme}
+    />
+  );
 }
 
 function pluginJsonLd(plugin: PluginRecord, lang: "zh" | "en") {
