@@ -6,7 +6,7 @@ import type {
   PluginRecord,
   PluginRegistryData,
 } from "@/lib/plugin-data";
-import { comparePluginsByEvidence, suggestedInstallCommand, visiblePluginName } from "@/lib/plugin-screening.mjs";
+import { comparePluginsByEvidence, displayDescription, suggestedInstallCommand, visiblePluginName } from "@/lib/plugin-screening.mjs";
 import Link from "next/link";
 import { type FormEvent, type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -44,6 +44,7 @@ const CATEGORY_HINTS: Record<CategoryId, Record<Language, string>> = {
 
 const PREFS_KEY = "dsh-plugin-hub-prefs-v2";
 const CATALOG_RETURN_KEY = "dsh-plugin-hub-catalog-return";
+const RECENT_KEY = "dsh-plugin-hub-recent-v1";
 const RESULT_BATCH_SIZE = 36;
 const PAGE_PATHS: Record<Exclude<PageId, "plugin">, string> = {
   home: "/",
@@ -170,7 +171,7 @@ function PluginDetail({
         <span>{plugin.license || text(lang, "许可证未声明", "License missing")}</span>
         <span>{plugin.language || text(lang, "语言未知", "Language unknown")}</span>
       </div>
-      <p className="drawer-description" id="plugin-description">{plugin.description[lang]}</p>
+      <p className="drawer-description" id="plugin-description">{displayDescription(plugin, lang)}</p>
 
       <div className="drawer-section">
         <span className="drawer-label">{text(lang, "安装证据", "INSTALL EVIDENCE")}</span>
@@ -269,7 +270,7 @@ function PluginCard({
             </span>
           </span>
           <span className="plugin-card__owner">{plugin.repo}</span>
-          <span className="plugin-card__description">{plugin.description[lang]}</span>
+          <span className="plugin-card__description">{displayDescription(plugin, lang)}</span>
           <span className="plugin-card__meta">
             <span>★ {formatNumber(plugin.stars, lang)}</span>
             <span>{relativeDate(plugin.pushedAt, lang)}</span>
@@ -323,6 +324,8 @@ export function PluginHub({
   const [sort, setSort] = useState<SortId>("evidence");
   const [homeQuery, setHomeQuery] = useState("");
   const [catalogHref, setCatalogHref] = useState("/plugins");
+  const [recent, setRecent] = useState<Array<{ id: string; name: string; repo: string }>>([]);
+  const loadMoreRef = useRef<HTMLButtonElement | null>(null);
   const [view, setView] = useState<"list" | "cards">("list");
   const [evidence, setEvidence] = useState<EvidenceFilter>("all");
   const [favorites, setFavorites] = useState<string[]>([]);
@@ -377,6 +380,10 @@ export function PluginHub({
         if (Array.isArray(saved.favorites)) setFavorites(saved.favorites);
         const catalogReturn = sessionStorage.getItem(CATALOG_RETURN_KEY);
         if (catalogReturn?.startsWith("/plugins")) setCatalogHref(catalogReturn);
+        const storedRecent = JSON.parse(sessionStorage.getItem(RECENT_KEY) || "[]");
+        if (Array.isArray(storedRecent)) {
+          setRecent(storedRecent.filter((item) => item && typeof item.id === "string" && typeof item.repo === "string").slice(0, 6));
+        }
       } catch {
         // Keep defaults when a browser contains malformed old preferences.
       } finally {
@@ -410,7 +417,17 @@ export function PluginHub({
       : `${pageTitle} · ${text(lang, "DSH 插件资源站", "DSH Plugin Hub")}`;
   }, [lang, page, selected]);
 
+  const rememberRecent = useCallback((plugin: PluginRecord) => {
+    const item = { id: plugin.id, name: visiblePluginName(plugin), repo: plugin.repo };
+    setRecent((current) => {
+      const next = [item, ...current.filter((entry) => entry.id !== item.id)].slice(0, 6);
+      try { sessionStorage.setItem(RECENT_KEY, JSON.stringify(next)); } catch { /* optional */ }
+      return next;
+    });
+  }, []);
+
   const openPlugin = useCallback((plugin: PluginRecord) => {
+    rememberRecent(plugin);
     if (preferDedicatedPluginPage()) {
       window.location.assign(pluginPath(plugin));
       return;
@@ -418,7 +435,7 @@ export function PluginHub({
     returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     window.history.pushState({ drawer: true }, "", pluginPath(plugin));
     setSelected(plugin);
-  }, []);
+  }, [rememberRecent]);
 
   const closeSelected = useCallback(() => {
     if (page === "plugin") {
@@ -594,18 +611,38 @@ export function PluginHub({
     copy(url, `${selected.id}-link`);
   }, [copy, selected]);
 
+  useEffect(() => {
+    if (selected) rememberRecent(selected);
+  }, [rememberRecent, selected]);
+
   const filterKey = `${query}\u0000${category}\u0000${sort}\u0000${evidence}`;
   const visibleCount = visibleWindow.key === filterKey ? visibleWindow.count : RESULT_BATCH_SIZE;
   const visiblePlugins = filtered.slice(0, visibleCount);
+  const hasMore = visiblePlugins.length < filtered.length;
   const inspectedCount = initialInspectedCount
     ?? data.plugins.filter((plugin) => plugin.screening.scope === "source").length;
 
+  useEffect(() => {
+    const node = loadMoreRef.current;
+    if (!node || !hasMore || page !== "catalog") return;
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) return;
+      setVisibleWindow((current) => {
+        const count = current.key === filterKey ? current.count : RESULT_BATCH_SIZE;
+        if (count >= filtered.length) return current;
+        return { key: filterKey, count: count + RESULT_BATCH_SIZE };
+      });
+    }, { rootMargin: "240px" });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [filterKey, filtered.length, hasMore, page]);
+
   const topStars = useMemo(
-    () => [...data.plugins].filter((plugin) => plugin.stars !== null).sort((a, b) => (b.stars || 0) - (a.stars || 0)).slice(0, 20),
+    () => [...data.plugins].filter((plugin) => plugin.stars !== null && plugin.screening.state !== "blocked").sort((a, b) => (b.stars || 0) - (a.stars || 0)).slice(0, 20),
     [data.plugins],
   );
   const topFresh = useMemo(
-    () => [...data.plugins].filter((plugin) => plugin.pushedAt).sort((a, b) => Date.parse(b.pushedAt || "0") - Date.parse(a.pushedAt || "0")).slice(0, 20),
+    () => [...data.plugins].filter((plugin) => plugin.pushedAt && plugin.screening.state !== "blocked").sort((a, b) => Date.parse(b.pushedAt || "0") - Date.parse(a.pushedAt || "0")).slice(0, 20),
     [data.plugins],
   );
   const featured = topStars.slice(0, 6);
@@ -711,17 +748,17 @@ export function PluginHub({
 
             <section className="metrics" aria-label={text(lang, "数据概览", "Registry metrics")}>
               <div className="shell metrics__grid">
-                <div><strong>{data.summary.listed}</strong><span>{text(lang, "目录插件", "Listed plugins")}</span></div>
-                <div><strong>{data.summary.autoDiscovered}</strong><span>{text(lang, "自动发现", "Auto-discovered")}</span></div>
+                <Link href="/plugins" prefetch={false}><strong>{data.summary.listed}</strong><span>{text(lang, "目录插件", "Listed plugins")}</span></Link>
+                <Link href="/plugins?evidence=auto" prefetch={false}><strong>{data.summary.autoDiscovered}</strong><span>{text(lang, "自动发现", "Auto-discovered")}</span></Link>
                 <div><strong>{formatNumber(data.summary.topicTotal, lang)}</strong><span>{text(lang, "GitHub 话题仓库", "Topic repositories")}</span></div>
-                <div><strong>{data.summary.screeningClear}</strong><span>{text(lang, "静态检查通过", "Static scan clear")}</span></div>
-                <div><strong>{data.summary.screeningReview + data.summary.screeningBlocked}</strong><span>{text(lang, "待复核或拦截", "Review or blocked")}</span></div>
+                <Link href="/plugins?evidence=clear" prefetch={false}><strong>{data.summary.screeningClear}</strong><span>{text(lang, "静态检查通过", "Static scan clear")}</span></Link>
+                <Link href="/plugins?evidence=review" prefetch={false}><strong>{data.summary.screeningReview + data.summary.screeningBlocked}</strong><span>{text(lang, "待复核或拦截", "Review or blocked")}</span></Link>
               </div>
             </section>
 
             <section className="section shell">
               <div className="section-heading">
-                <div><span className="section-kicker">COMMUNITY SIGNAL</span><h2>{text(lang, "社区热度", "Community signal")}</h2></div>
+                <div><span className="section-kicker">VERIFIED POPULAR</span><h2>{text(lang, "已通过检查的热门插件", "Popular plugins that passed screening")}</h2></div>
                 <Link className="text-button" href="/rank" prefetch={false}>{text(lang, "完整排行榜", "Full leaderboard")} →</Link>
               </div>
               <div className="featured-grid">
@@ -731,12 +768,23 @@ export function PluginHub({
                     <span className="featured-card__head"><strong>{visiblePluginName(plugin)}</strong><em>★ {formatNumber(plugin.stars, lang)}</em></span>
                     <span className="featured-card__owner">{plugin.repo}</span>
                     <span className={`signal signal--${plugin.attention.level}`}>{signalLabel(plugin, lang)}</span>
-                    <span className="featured-card__desc">{plugin.description[lang]}</span>
+                    <span className="featured-card__desc">{displayDescription(plugin, lang)}</span>
                     <span className="featured-card__foot">{data.categories[plugin.category][lang]} <i>→</i></span>
                   </Link>
                 ))}
               </div>
             </section>
+
+            {recent.length > 0 && (
+              <section className="section shell recent-section">
+                <div className="section-heading"><div><span className="section-kicker">CONTINUE</span><h2>{text(lang, "最近看过", "Recently viewed")}</h2></div></div>
+                <ul className="recent-list">
+                  {recent.map((item) => (
+                    <li key={item.id}><Link href={`/plugin/${item.id.split("/").map(encodeURIComponent).join("/")}`} prefetch={false}><strong>{item.name}</strong><small>{item.repo}</small></Link></li>
+                  ))}
+                </ul>
+              </section>
+            )}
 
             <section className="section shell">
               <div className="section-heading"><div><span className="section-kicker">BROWSE</span><h2>{text(lang, "按分类逛", "Browse by category")}</h2></div></div>
@@ -805,6 +853,12 @@ export function PluginHub({
                 <button className={view === "cards" ? "is-active" : ""} type="button" onClick={() => setView("cards")} aria-label={text(lang, "卡片视图", "Card view")} aria-pressed={view === "cards"}>▦</button>
               </div>
             </div>
+            <div className="quick-filters" role="group" aria-label={text(lang, "快捷筛选", "Quick filters")}>
+              <button className={evidence === "all" ? "is-active" : ""} type="button" onClick={() => setEvidence("all")}>{text(lang, "全部", "All")}</button>
+              <button className={evidence === "clear" ? "is-active" : ""} type="button" onClick={() => setEvidence("clear")}>{text(lang, "检查通过", "Screened clear")}</button>
+              <button className={evidence === "review" ? "is-active" : ""} type="button" onClick={() => setEvidence("review")}>{text(lang, "待复核", "Needs review")}</button>
+              <button className={evidence === "favorites" ? "is-active" : ""} type="button" onClick={() => setEvidence("favorites")}>{text(lang, "收藏", "Saved")}</button>
+            </div>
             <div className="category-chips">
               <button className={category === "all" ? "is-active" : ""} type="button" onClick={() => setCategory("all")} aria-pressed={category === "all"}>{text(lang, "全部", "All")} <small>{data.summary.listed}</small></button>
               {CATEGORY_ORDER.map((id) => (
@@ -828,7 +882,7 @@ export function PluginHub({
             ) : (
               <div className="empty-state"><strong>{text(lang, "没有匹配的插件", "No matching plugins")}</strong><p>{text(lang, "换个关键词或清空筛选条件。", "Try another keyword or reset the filters.")}</p><button type="button" onClick={() => { setQuery(""); setCategory("all"); setEvidence("all"); }}>{text(lang, "清空筛选", "Reset filters")}</button></div>
             )}
-            {visiblePlugins.length < filtered.length && <button className="load-more" type="button" onClick={() => setVisibleWindow({ key: filterKey, count: visibleCount + RESULT_BATCH_SIZE })}>{text(lang, `加载更多（还有 ${filtered.length - visiblePlugins.length} 个）`, `Load more (${filtered.length - visiblePlugins.length} remaining)`)}</button>}
+            {hasMore && <button ref={loadMoreRef} className="load-more" type="button" onClick={() => setVisibleWindow({ key: filterKey, count: visibleCount + RESULT_BATCH_SIZE })}>{text(lang, `加载更多（还有 ${filtered.length - visiblePlugins.length} 个）`, `Load more (${filtered.length - visiblePlugins.length} remaining)`)}</button>}
           </section>
         )}
 
@@ -838,11 +892,11 @@ export function PluginHub({
             <div className="rank-grid">
               <div className="rank-panel">
                 <div className="rank-panel__heading"><span>★</span><div><h2>{text(lang, "按星标", "By stars")}</h2><p>{text(lang, "社区关注度", "Community attention")}</p></div></div>
-                <ol>{topStars.map((plugin, index) => <li key={plugin.id}><Link href={pluginPath(plugin)} prefetch={false} onClick={(event) => openInDrawer(event, () => openPlugin(plugin))}><b>{String(index + 1).padStart(2, "0")}</b><span><strong>{visiblePluginName(plugin)}</strong><small>{plugin.repo}</small></span><em>★ {formatNumber(plugin.stars, lang)}</em></Link></li>)}</ol>
+                <ol>{topStars.map((plugin, index) => <li key={plugin.id}><Link href={pluginPath(plugin)} prefetch={false} onClick={(event) => openInDrawer(event, () => openPlugin(plugin))}><b>{String(index + 1).padStart(2, "0")}</b><span><strong>{visiblePluginName(plugin)}</strong><small>{plugin.repo}</small></span><em>★ {formatNumber(plugin.stars, lang)}</em><span className={`signal signal--${plugin.attention.level}`}>{signalLabel(plugin, lang)}</span></Link></li>)}</ol>
               </div>
               <div className="rank-panel">
                 <div className="rank-panel__heading"><span>↻</span><div><h2>{text(lang, "最近更新", "Recently pushed")}</h2><p>{text(lang, "维护活跃度", "Maintenance activity")}</p></div></div>
-                <ol>{topFresh.map((plugin, index) => <li key={plugin.id}><Link href={pluginPath(plugin)} prefetch={false} onClick={(event) => openInDrawer(event, () => openPlugin(plugin))}><b>{String(index + 1).padStart(2, "0")}</b><span><strong>{visiblePluginName(plugin)}</strong><small>{plugin.repo}</small></span><em>{relativeDate(plugin.pushedAt, lang)}</em></Link></li>)}</ol>
+                <ol>{topFresh.map((plugin, index) => <li key={plugin.id}><Link href={pluginPath(plugin)} prefetch={false} onClick={(event) => openInDrawer(event, () => openPlugin(plugin))}><b>{String(index + 1).padStart(2, "0")}</b><span><strong>{visiblePluginName(plugin)}</strong><small>{plugin.repo}</small></span><em>{relativeDate(plugin.pushedAt, lang)}</em><span className={`signal signal--${plugin.attention.level}`}>{signalLabel(plugin, lang)}</span></Link></li>)}</ol>
               </div>
             </div>
           </section>

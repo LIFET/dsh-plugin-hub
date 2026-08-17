@@ -5,6 +5,7 @@ export function comparePluginsByEvidence(a: unknown, b: unknown): number;
 export function resolveRegistryScanLimit(input?: { token?: string; requested?: string | number }): number;
 export function suggestedInstallCommand(plugin: { repo?: string; screenedCommit?: string | null }): string;
 export function visiblePluginName(plugin: { name?: string; repo?: string }): string;
+export function displayDescription(plugin: { description?: { zh?: string; en?: string } }, lang?: string): string;
 export function selectFeaturedPlugins<T>(plugins: T[], limit?: number): T[];
 export function selectRelatedPlugins<T>(plugins: T[], current: T | null | undefined, limit?: number): T[];
 export function inspectionQueuePriority(previous: { screening?: { scope?: string } } | null | undefined): number;

@@ -28,11 +28,11 @@ const registry = cache(async () => {
 
 function rankingData(data: PluginRegistryData) {
   const byStars = [...data.plugins]
-    .filter((plugin) => plugin.stars !== null)
+    .filter((plugin) => plugin.stars !== null && plugin.screening.state !== "blocked")
     .sort((a, b) => (b.stars || 0) - (a.stars || 0))
     .slice(0, 20);
   const byFreshness = [...data.plugins]
-    .filter((plugin) => plugin.pushedAt)
+    .filter((plugin) => plugin.pushedAt && plugin.screening.state !== "blocked")
     .sort((a, b) => Date.parse(b.pushedAt || "0") - Date.parse(a.pushedAt || "0"))
     .slice(0, 20);
   const plugins = [...new Map([...byStars, ...byFreshness].map((plugin) => [plugin.id, plugin])).values()];

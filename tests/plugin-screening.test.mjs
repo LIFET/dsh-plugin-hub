@@ -16,6 +16,7 @@ import {
   selectRelatedPlugins,
   suggestedInstallCommand,
   visiblePluginName,
+  displayDescription,
   inspectionQueuePriority,
 } from "../lib/plugin-screening.mjs";
 
@@ -83,6 +84,11 @@ test("picks related plugins from the same category", () => {
     { id: "e/five", category: "tools", screening: { state: "review" }, stars: 3 },
   ], current, 3);
   assert.deepEqual(related.map((plugin) => plugin.id), ["b/two", "e/five"]);
+});
+
+test("strips GitHub source prefixes from descriptions", () => {
+  assert.equal(displayDescription({ description: { zh: "[GitHub 原文] Hello", en: "[GitHub description] Hello" } }, "zh"), "Hello");
+  assert.equal(displayDescription({ description: { zh: "选中文字批注", en: "Annotate selected text" } }, "zh"), "选中文字批注");
 });
 
 test("strips npm scopes from visible plugin names", () => {
