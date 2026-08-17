@@ -12,6 +12,15 @@ export function visiblePluginName(plugin: { name?: string; repo?: string }): str
 export function displayDescription(plugin: { description?: { zh?: string; en?: string } }, lang?: string): string;
 export function selectFeaturedPlugins<T>(plugins: T[], limit?: number): T[];
 export function selectRelatedPlugins<T>(plugins: T[], current: T | null | undefined, limit?: number): T[];
+export function normalizeOwnerParam(value: unknown): string;
+export function catalogPageTitle(input?: {
+  query?: string;
+  category?: string;
+  owner?: string;
+  lang?: string;
+  categories?: Record<string, { zh?: string; en?: string }>;
+  fallback?: string;
+}): string;
 export function inspectionQueuePriority(previous: { screening?: { scope?: string } } | null | undefined): number;
 
 export interface ScreeningManifest {

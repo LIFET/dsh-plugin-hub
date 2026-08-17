@@ -13,6 +13,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   return [
     { url: base, lastModified: generated, changeFrequency: "daily", priority: 1 },
     { url: `${base}/plugins`, lastModified: generated, changeFrequency: "hourly", priority: 0.9 },
+    ...Object.keys(registry.categories).map((category) => ({
+      url: `${base}/plugins?category=${category}`,
+      lastModified: generated,
+      changeFrequency: "hourly" as const,
+      priority: 0.7,
+    })),
     { url: `${base}/rank`, lastModified: generated, changeFrequency: "daily", priority: 0.7 },
     { url: `${base}/submit`, changeFrequency: "monthly", priority: 0.5 },
     { url: `${base}/guide`, changeFrequency: "monthly", priority: 0.6 },

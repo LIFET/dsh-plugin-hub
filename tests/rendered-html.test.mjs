@@ -114,7 +114,8 @@ test("server-renders the complete plugin hub", async () => {
 test("serves shareable pages and plugin detail metadata", async () => {
   const registry = JSON.parse(await readFile(new URL("data/plugins.generated.json", root), "utf8"));
   for (const [path, expected] of [
-    ["/plugins?q=tool", "插件目录"],
+    ["/plugins?q=tool", "搜索 tool"],
+    ["/plugins?category=memory", "<title>记忆"],
     ["/rank", "排行榜"],
     ["/submit", "让你的插件被看见"],
     ["/guide", "从一个可检查的插件开始"],
@@ -225,7 +226,9 @@ test("serves crawl metadata and a branded not-found page", async () => {
 
   const sitemap = await request("/sitemap.xml", "application/xml");
   assert.equal(sitemap.status, 200);
-  assert.match(await sitemap.text(), /https:\/\/apiu\.cc\/plugin\//u);
+  const sitemapText = await sitemap.text();
+  assert.match(sitemapText, /https:\/\/apiu\.cc\/plugin\//u);
+  assert.match(sitemapText, /https:\/\/apiu\.cc\/plugins\?category=memory/u);
 
   const missing = await request("/does-not-exist");
   assert.equal(missing.status, 404);

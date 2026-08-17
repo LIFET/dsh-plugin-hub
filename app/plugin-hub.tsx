@@ -6,7 +6,7 @@ import type {
   PluginRecord,
   PluginRegistryData,
 } from "@/lib/plugin-data";
-import { comparePluginsByEvidence, displayDescription, displayInstallCommand, matchesSearchQuery, pluginSearchHaystack, suggestedInstallCommand, visiblePluginName, withPackageRunner } from "@/lib/plugin-screening.mjs";
+import { catalogPageTitle, comparePluginsByEvidence, displayDescription, displayInstallCommand, matchesSearchQuery, normalizeOwnerParam, pluginSearchHaystack, selectRelatedPlugins, suggestedInstallCommand, visiblePluginName, withPackageRunner } from "@/lib/plugin-screening.mjs";
 import Link from "next/link";
 import { type FormEvent, type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -162,9 +162,11 @@ function PluginDetail({
   favorite,
   copied,
   related,
+  catalogHref,
   onCopy,
   onFavorite,
   onShare,
+  onOpenRelated,
 }: {
   plugin: PluginRecord;
   lang: Language;
@@ -172,9 +174,11 @@ function PluginDetail({
   favorite: boolean;
   copied: string | null;
   related: PluginRecord[];
+  catalogHref: string;
   onCopy: (value: string, id: string) => void;
   onFavorite: () => void;
   onShare: () => void;
+  onOpenRelated?: (plugin: PluginRecord) => void;
 }) {
   const suggested = suggestedInstallCommand(plugin);
   const [profile, setProfile] = useState<"web" | "default">("web");
@@ -186,8 +190,21 @@ function PluginDetail({
         <span className={`evidence evidence--${sourceClass(plugin)}`}>{sourceLabel(plugin)}</span>
         <span className={`signal signal--${plugin.attention.level}`}>{signalLabel(plugin, lang)}</span>
       </div>
+      <nav className="plugin-crumbs" aria-label={text(lang, "面包屑", "Breadcrumb")}>
+        <Link href={catalogHref} prefetch={false}>{text(lang, "目录", "Catalog")}</Link>
+        <span aria-hidden="true">/</span>
+        <Link href={`/plugins?category=${plugin.category}`} prefetch={false}>{categoryLabel}</Link>
+        <span aria-hidden="true">/</span>
+        <Link href={`/plugins?owner=${encodeURIComponent(plugin.owner)}`} prefetch={false}>{plugin.owner}</Link>
+      </nav>
       <h1 id="plugin-title">{visiblePluginName(plugin)}</h1>
-      <p className="drawer-owner">{plugin.repo} · {plugin.owner} · {categoryLabel}</p>
+      <p className="drawer-owner">
+        <a href={plugin.url} target="_blank" rel="noreferrer">{plugin.repo}</a>
+        {" · "}
+        <Link href={`/plugins?owner=${encodeURIComponent(plugin.owner)}`} prefetch={false}>{plugin.owner}</Link>
+        {" · "}
+        <Link href={`/plugins?category=${plugin.category}`} prefetch={false}>{categoryLabel}</Link>
+      </p>
       <div className="stat-chips">
         <span>★ {formatNumber(plugin.stars, lang)}</span>
         <span>{relativeDate(plugin.pushedAt, lang)}</span>
@@ -253,7 +270,10 @@ function PluginDetail({
           <ul className="related-list">
             {related.map((item) => (
               <li key={item.id}>
-                <Link href={pluginPath(item)} prefetch={false}>
+                <Link href={pluginPath(item)} prefetch={false} onClick={(event) => {
+                  if (!onOpenRelated) return;
+                  openInDrawer(event, () => onOpenRelated(item));
+                }}>
                   <strong>{visiblePluginName(item)}</strong>
                   <small>{item.repo}</small>
                   <span className={`signal signal--${item.attention.level}`}>{signalLabel(item, lang)}</span>
@@ -272,19 +292,25 @@ function PluginCard({
   plugin,
   lang,
   favorite,
+  copied,
   onOpen,
   onFavorite,
+  onCopy,
   view,
   query,
 }: {
   plugin: PluginRecord;
   lang: Language;
   favorite: boolean;
+  copied: string | null;
   onOpen: () => void;
   onFavorite: () => void;
+  onCopy: (value: string, id: string) => void;
   view: "list" | "cards";
   query: string;
 }) {
+  const command = withPackageRunner(displayInstallCommand(plugin.installCommand || suggestedInstallCommand(plugin), "web"), "dsh");
+  const copyId = `${plugin.id}-card`;
   return (
     <article className={`plugin-card plugin-card--${view}`}>
       <Link className="plugin-card__main" href={pluginPath(plugin)} prefetch={false} onClick={(event) => openInDrawer(event, onOpen)}>
@@ -307,15 +333,26 @@ function PluginCard({
           </span>
         </span>
       </Link>
-      <button
-        className={`favorite-button ${favorite ? "is-active" : ""}`}
-        type="button"
-        onClick={onFavorite}
-        aria-label={text(lang, favorite ? "取消收藏" : "收藏", favorite ? "Remove favorite" : "Save favorite")}
-        title={text(lang, favorite ? "取消收藏" : "收藏", favorite ? "Remove favorite" : "Save favorite")}
-      >
-        ★
-      </button>
+      <div className="plugin-card__actions">
+        <button
+          className="copy-install"
+          type="button"
+          onClick={() => onCopy(command, copyId)}
+          aria-label={plugin.installCommand ? text(lang, "复制安装命令", "Copy install command") : text(lang, "复制建议安装命令", "Copy suggested install command")}
+          title={plugin.installCommand ? text(lang, "复制安装命令", "Copy install command") : text(lang, "复制建议命令，安装前请核对源码", "Copy suggested command; review source first")}
+        >
+          {copied === copyId ? "✓" : "⎘"}
+        </button>
+        <button
+          className={`favorite-button ${favorite ? "is-active" : ""}`}
+          type="button"
+          onClick={onFavorite}
+          aria-label={text(lang, favorite ? "取消收藏" : "收藏", favorite ? "Remove favorite" : "Save favorite")}
+          title={text(lang, favorite ? "取消收藏" : "收藏", favorite ? "Remove favorite" : "Save favorite")}
+        >
+          ★
+        </button>
+      </div>
     </article>
   );
 }
@@ -334,6 +371,7 @@ export function PluginHub({
   initialCategory = "all",
   initialEvidence = "all",
   initialSort = "evidence",
+  initialOwner = "",
 }: {
   data: PluginRegistryData;
   initialPage?: PageId;
@@ -348,6 +386,7 @@ export function PluginHub({
   initialCategory?: "all" | CategoryId;
   initialEvidence?: EvidenceFilter;
   initialSort?: SortId;
+  initialOwner?: string;
 }) {
   const data = initialData;
   const [registrySource] = useState<"bundled" | "live">(initialSource);
@@ -356,6 +395,9 @@ export function PluginHub({
   const [theme, setTheme] = useState<"dark" | "light">(initialTheme);
   const [preferencesReady, setPreferencesReady] = useState(false);
   const [query, setQuery] = useState(initialQuery);
+  const [owner, setOwner] = useState(normalizeOwnerParam(initialOwner));
+  const [suggestOpen, setSuggestOpen] = useState(false);
+  const [suggestIndex, setSuggestIndex] = useState(-1);
   const [category, setCategory] = useState<"all" | CategoryId>(initialCategory);
   const [sort, setSort] = useState<SortId>(["evidence", "curated", "stars", "updated", "added", "name"].includes(initialSort) ? initialSort : "evidence");
   const [homeQuery, setHomeQuery] = useState("");
@@ -407,6 +449,7 @@ export function PluginHub({
       const initialSort = params.get("sort");
       const initialEvidence = params.get("evidence");
       setQuery(params.get("q") || "");
+      setOwner(normalizeOwnerParam(params.get("owner") || ""));
       if (initialCategory === "all" || CATEGORY_ORDER.includes(initialCategory as CategoryId)) setCategory(initialCategory as "all" | CategoryId);
       if (["evidence", "curated", "stars", "updated", "added", "name"].includes(initialSort || "")) setSort(initialSort as SortId);
       if (["all", "auto", "topic", "manifest", "clear", "review", "favorites"].includes(initialEvidence || "")) setEvidence(initialEvidence as EvidenceFilter);
@@ -454,12 +497,17 @@ export function PluginHub({
     const site = text(lang, "DSH 插件资源站", "DSH Plugin Hub");
     if (page === "home" && !selected) document.title = site;
     else if (page === "catalog" && !selected) {
-      const q = query.trim();
-      const cat = category !== "all" ? data.categories[category]?.[lang] : "";
-      const label = q || cat || text(lang, "插件目录", "Plugin catalog");
+      const label = catalogPageTitle({
+        query,
+        category,
+        owner,
+        lang,
+        categories: data.categories,
+        fallback: text(lang, "插件目录", "Plugin catalog"),
+      });
       document.title = `${label} · ${site}`;
     } else document.title = `${pageTitle} · ${site}`;
-  }, [category, data.categories, lang, page, query, selected]);
+  }, [category, data.categories, lang, owner, page, query, selected]);
 
   const rememberRecent = useCallback((plugin: PluginRecord) => {
     const item = { id: plugin.id, name: visiblePluginName(plugin), repo: plugin.repo };
@@ -483,7 +531,7 @@ export function PluginHub({
 
   const closeSelected = useCallback(() => {
     if (page === "plugin") {
-      window.history.pushState(null, "", PAGE_PATHS.catalog);
+      window.history.pushState(null, "", catalogHref);
       setPage("catalog");
       setSelected(null);
       return;
@@ -494,7 +542,7 @@ export function PluginHub({
       setPage("catalog");
       setSelected(null);
     }
-  }, [page]);
+  }, [catalogHref, page]);
 
   useEffect(() => {
     if (!selected || page === "plugin") return;
@@ -578,6 +626,7 @@ export function PluginHub({
       if (evidence === "clear" && plugin.screening.state !== "clear") return false;
       if (evidence === "review" && !["review", "pending", "blocked"].includes(plugin.screening.state)) return false;
       if (evidence === "favorites" && !favoriteSet.has(plugin.id)) return false;
+      if (owner && plugin.owner.toLowerCase() !== owner.toLowerCase()) return false;
       return matchesSearchQuery(
         pluginSearchHaystack(plugin, [
           data.categories[plugin.category]?.zh || "",
@@ -588,7 +637,7 @@ export function PluginHub({
         query,
       );
     });
-  }, [data.categories, data.plugins, evidence, favorites, query]);
+  }, [data.categories, data.plugins, evidence, favorites, owner, query]);
 
   const computedCategoryCounts = useMemo(() => {
     const counts = Object.fromEntries(CATEGORY_ORDER.map((id) => [id, 0])) as Record<CategoryId, number>;
@@ -617,6 +666,7 @@ export function PluginHub({
     if (!preferencesReady || page !== "catalog" || selected) return;
     const params = new URLSearchParams();
     if (query.trim()) params.set("q", query.trim());
+    if (owner) params.set("owner", owner);
     if (category !== "all") params.set("category", category);
     if (sort !== "evidence") params.set("sort", sort);
     if (evidence !== "all") params.set("evidence", evidence);
@@ -625,14 +675,81 @@ export function PluginHub({
     window.history.replaceState(null, "", next);
     try { sessionStorage.setItem(CATALOG_RETURN_KEY, next); } catch { /* optional */ }
     setCatalogHref(next);
-  }, [category, evidence, page, preferencesReady, query, selected, sort]);
+  }, [category, evidence, owner, page, preferencesReady, query, selected, sort]);
+
+  const suggestions = useMemo(() => {
+    const needle = query.trim();
+    if (page !== "catalog" || needle.length < 2) return [] as Array<
+      | { type: "plugin"; plugin: PluginRecord }
+      | { type: "owner"; owner: string; count: number }
+      | { type: "category"; id: CategoryId; label: string }
+    >;
+    const pluginHits = filtered.slice(0, 5).map((plugin) => ({ type: "plugin" as const, plugin }));
+    const ownerCounts = new Map<string, number>();
+    for (const plugin of data.plugins) {
+      if (plugin.owner.toLowerCase().includes(needle.toLowerCase())) {
+        ownerCounts.set(plugin.owner, (ownerCounts.get(plugin.owner) || 0) + 1);
+      }
+    }
+    const ownerHits = [...ownerCounts.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .slice(0, 3)
+      .map(([name, count]) => ({ type: "owner" as const, owner: name, count }));
+    const categoryHits = CATEGORY_ORDER
+      .filter((id) => {
+        const label = data.categories[id]?.[lang] || "";
+        const hint = CATEGORY_HINTS[id][lang];
+        return `${id} ${label} ${hint}`.toLowerCase().includes(needle.toLowerCase());
+      })
+      .slice(0, 2)
+      .map((id) => ({ type: "category" as const, id, label: data.categories[id]?.[lang] || id }));
+    return [...categoryHits, ...ownerHits, ...pluginHits].slice(0, 8);
+  }, [data.categories, data.plugins, filtered, lang, page, query]);
+
+  const applySuggestion = useCallback((item: typeof suggestions[number]) => {
+    if (item.type === "plugin") {
+      setSuggestOpen(false);
+      openPlugin(item.plugin);
+      return;
+    }
+    if (item.type === "owner") {
+      setOwner(item.owner);
+      setQuery("");
+    } else {
+      setCategory(item.id);
+      setQuery("");
+    }
+    setSuggestOpen(false);
+    setSuggestIndex(-1);
+  }, [openPlugin]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && page === "catalog" && query.trim()) {
+      if (event.key === "Escape" && page === "catalog" && (suggestOpen || query.trim())) {
         event.preventDefault();
+        if (suggestOpen) {
+          setSuggestOpen(false);
+          setSuggestIndex(-1);
+          return;
+        }
         setQuery("");
         return;
+      }
+      if (page === "catalog" && suggestOpen && suggestions.length) {
+        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+          event.preventDefault();
+          setSuggestIndex((current) => {
+            const last = suggestions.length - 1;
+            if (event.key === "ArrowDown") return current < last ? current + 1 : 0;
+            return current > 0 ? current - 1 : last;
+          });
+          return;
+        }
+        if (event.key === "Enter" && suggestIndex >= 0 && suggestions[suggestIndex]) {
+          event.preventDefault();
+          applySuggestion(suggestions[suggestIndex]);
+          return;
+        }
       }
       if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey) return;
       const target = event.target;
@@ -644,12 +761,18 @@ export function PluginHub({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [page, query]);
+  }, [applySuggestion, page, query, suggestIndex, suggestOpen, suggestions]);
 
-  const relatedPlugins = useMemo(
-    () => data.plugins.filter((plugin) => relatedPluginIds.includes(plugin.id)),
-    [data.plugins, relatedPluginIds],
-  );
+  const relatedPlugins = useMemo(() => {
+    if (!selected) return [];
+    if (relatedPluginIds.length) {
+      const listed = relatedPluginIds
+        .map((id) => data.plugins.find((plugin) => plugin.id === id))
+        .filter((plugin): plugin is PluginRecord => Boolean(plugin));
+      if (listed.length) return listed;
+    }
+    return selectRelatedPlugins(data.plugins, selected, 3);
+  }, [data.plugins, relatedPluginIds, selected]);
 
   const shareSelected = useCallback(async () => {
     if (!selected) return;
@@ -669,7 +792,7 @@ export function PluginHub({
     if (selected) rememberRecent(selected);
   }, [rememberRecent, selected]);
 
-  const filterKey = `${query}\u0000${category}\u0000${sort}\u0000${evidence}`;
+  const filterKey = `${query}\u0000${category}\u0000${sort}\u0000${evidence}\u0000${owner}`;
   const visibleCount = visibleWindow.key === filterKey ? visibleWindow.count : RESULT_BATCH_SIZE;
   const visiblePlugins = filtered.slice(0, visibleCount);
   const hasMore = visiblePlugins.length < filtered.length;
@@ -699,7 +822,7 @@ export function PluginHub({
     () => [...data.plugins].filter((plugin) => plugin.pushedAt && plugin.screening.state !== "blocked").sort((a, b) => Date.parse(b.pushedAt || "0") - Date.parse(a.pushedAt || "0")).slice(0, 20),
     [data.plugins],
   );
-  const featured = topStars.slice(0, 6);
+  const featured = page === "home" ? data.plugins.slice(0, 6) : topStars.slice(0, 6);
   const generatedLabel = data.generatedAt.slice(0, 16).replace("T", " ") + " UTC";
   const automationLabel = data.automation.state === "live"
     ? text(lang, "自动同步正常", "Automated sync healthy")
@@ -725,7 +848,7 @@ export function PluginHub({
             {PAGES.map((item) => (
               <Link
                 className={page === item.id ? "is-active" : ""}
-                href={PAGE_PATHS[item.id]}
+                href={item.id === "catalog" ? catalogHref : PAGE_PATHS[item.id]}
                 prefetch={false}
                 key={item.id}
                 aria-current={page === item.id ? "page" : undefined}
@@ -877,7 +1000,24 @@ export function PluginHub({
         {page === "catalog" && (
           <section className="catalog shell page-section">
             <div className="page-heading">
-              <div><span className="section-kicker">CATALOG</span><h1>{category === "all" ? text(lang, "插件目录", "Plugin catalog") : (data.categories[category]?.[lang] || text(lang, "插件目录", "Plugin catalog"))}</h1><p aria-live="polite">{text(lang, `${filtered.length} 个结果 · 数据生成于 ${generatedLabel}`, `${filtered.length} results · generated ${generatedLabel}`)}</p></div>
+              <div>
+                <span className="section-kicker">CATALOG</span>
+                <h1>{catalogPageTitle({
+                  query,
+                  category,
+                  owner,
+                  lang,
+                  categories: data.categories,
+                  fallback: text(lang, "插件目录", "Plugin catalog"),
+                })}</h1>
+                <p aria-live="polite">
+                  {text(lang, `${filtered.length} 个结果 · 数据生成于 ${generatedLabel}`, `${filtered.length} results · generated ${generatedLabel}`)}
+                  {category !== "all" && !query.trim() && !owner ? ` · ${CATEGORY_HINTS[category][lang]}` : ""}
+                </p>
+              </div>
+              <button className="text-button" type="button" onClick={() => copy(`${window.location.origin}${catalogHref}`, "catalog-link")}>
+                {copied === "catalog-link" ? text(lang, "链接已复制", "Link copied") : text(lang, "复制筛选链接", "Copy filter link")}
+              </button>
             </div>
             {recent.length > 0 && (
               <ul className="recent-list">
@@ -887,11 +1027,61 @@ export function PluginHub({
               </ul>
             )}
             <div className="catalog-toolbar">
-              <label className="search-field">
-                <span>/</span>
-                <input name="q" value={query} onChange={(event) => setQuery(event.target.value)} aria-label={text(lang, "搜索插件", "Search plugins")} placeholder={text(lang, "搜索名称、作者、仓库或能力，Esc 清空", "Search name, author, repo, or capability. Esc clears")} />
-                {query && <button type="button" onClick={() => setQuery("")} aria-label={text(lang, "清空搜索", "Clear search")}>×</button>}
-              </label>
+              <div className="search-combo">
+                <label className="search-field">
+                  <span>/</span>
+                  <input
+                    name="q"
+                    value={query}
+                    onChange={(event) => {
+                      setQuery(event.target.value);
+                      setSuggestOpen(true);
+                      setSuggestIndex(-1);
+                    }}
+                    onFocus={() => setSuggestOpen(true)}
+                    onBlur={() => window.setTimeout(() => setSuggestOpen(false), 120)}
+                    aria-label={text(lang, "搜索插件", "Search plugins")}
+                    aria-autocomplete="list"
+                    aria-expanded={suggestOpen && suggestions.length > 0}
+                    aria-controls="catalog-suggest"
+                    placeholder={text(lang, "搜索名称、作者、仓库或能力，Esc 清空", "Search name, author, repo, or capability. Esc clears")}
+                  />
+                  {query && <button type="button" onClick={() => { setQuery(""); setSuggestOpen(false); }} aria-label={text(lang, "清空搜索", "Clear search")}>×</button>}
+                </label>
+                {suggestOpen && suggestions.length > 0 && (
+                  <ul className="search-suggest" id="catalog-suggest" role="listbox">
+                    {suggestions.map((item, index) => (
+                      <li key={item.type === "plugin" ? item.plugin.id : item.type === "owner" ? `owner:${item.owner}` : `category:${item.id}`} role="option" aria-selected={index === suggestIndex}>
+                        <button
+                          className={index === suggestIndex ? "is-active" : ""}
+                          type="button"
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => applySuggestion(item)}
+                        >
+                          {item.type === "plugin" && (
+                            <>
+                              <strong>{visiblePluginName(item.plugin)}</strong>
+                              <small>{item.plugin.repo}</small>
+                            </>
+                          )}
+                          {item.type === "owner" && (
+                            <>
+                              <strong>{item.owner}</strong>
+                              <small>{text(lang, `${item.count} 个插件`, `${item.count} plugins`)}</small>
+                            </>
+                          )}
+                          {item.type === "category" && (
+                            <>
+                              <strong>{item.label}</strong>
+                              <small>{text(lang, "分类", "Category")}</small>
+                            </>
+                          )}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
               <select value={evidence} onChange={(event) => setEvidence(event.target.value as EvidenceFilter)} aria-label={text(lang, "证据筛选", "Evidence filter")}>
                 <option value="all">{text(lang, "全部证据状态", "All evidence")}</option>
                 <option value="auto">{text(lang, "网站自动发现", "Auto-discovered")}</option>
@@ -920,12 +1110,13 @@ export function PluginHub({
               <button className={evidence === "review" ? "is-active" : ""} type="button" onClick={() => setEvidence("review")}>{text(lang, "待复核", "Needs review")}</button>
               <button className={evidence === "favorites" ? "is-active" : ""} type="button" onClick={() => setEvidence("favorites")}>{text(lang, "收藏", "Saved")}</button>
             </div>
-            {(query.trim() || category !== "all" || evidence !== "all") && (
+            {(query.trim() || owner || category !== "all" || evidence !== "all") && (
               <div className="filter-summary">
                 {query.trim() && <button type="button" onClick={() => setQuery("")}>{text(lang, `搜索：${query.trim()}`, `Search: ${query.trim()}`)} ×</button>}
+                {owner && <button type="button" onClick={() => setOwner("")}>{text(lang, `作者：${owner}`, `Owner: ${owner}`)} ×</button>}
                 {category !== "all" && <button type="button" onClick={() => setCategory("all")}>{data.categories[category][lang]} ×</button>}
                 {evidence !== "all" && <button type="button" onClick={() => setEvidence("all")}>{text(lang, evidence === "clear" ? "检查通过" : evidence === "review" ? "待复核" : evidence === "favorites" ? "收藏" : evidence, evidence)} ×</button>}
-                <button type="button" onClick={() => { setQuery(""); setCategory("all"); setEvidence("all"); }}>{text(lang, "清除全部", "Clear all")}</button>
+                <button type="button" onClick={() => { setQuery(""); setOwner(""); setCategory("all"); setEvidence("all"); }}>{text(lang, "清除全部", "Clear all")}</button>
               </div>
             )}
             <div className="category-chips">
@@ -942,8 +1133,10 @@ export function PluginHub({
                     plugin={plugin}
                     lang={lang}
                     favorite={favorites.includes(plugin.id)}
+                    copied={copied}
                     onOpen={() => openPlugin(plugin)}
                     onFavorite={() => toggleFavorite(plugin.id)}
+                    onCopy={copy}
                     view={view}
                     query={query}
                   />
@@ -953,7 +1146,14 @@ export function PluginHub({
               <div className="empty-state">
                 <strong>{evidence === "favorites" && favorites.length === 0 ? text(lang, "还没有收藏", "No saved plugins yet") : text(lang, "没有匹配的插件", "No matching plugins")}</strong>
                 <p>{evidence === "favorites" && favorites.length === 0 ? text(lang, "在卡片右侧点星标，就能在这里集中查看。", "Tap the star on a card to save it here.") : text(lang, "换个关键词或清空筛选条件。", "Try another keyword or reset the filters.")}</p>
-                <button type="button" onClick={() => { setQuery(""); setCategory("all"); setEvidence("all"); }}>{text(lang, "清空筛选", "Reset filters")}</button>
+                <button type="button" onClick={() => { setQuery(""); setOwner(""); setCategory("all"); setEvidence("all"); }}>{text(lang, "清空筛选", "Reset filters")}</button>
+                <div className="empty-state__hints">
+                  {CATEGORY_ORDER.slice(0, 6).map((id) => (
+                    <button key={id} type="button" onClick={() => { setQuery(""); setOwner(""); setCategory(id); setEvidence("all"); }}>
+                      {data.categories[id][lang]}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
             {hasMore && <button ref={loadMoreRef} className="load-more" type="button" onClick={() => setVisibleWindow({ key: filterKey, count: visibleCount + RESULT_BATCH_SIZE })}>{text(lang, `加载更多（还有 ${filtered.length - visiblePlugins.length} 个）`, `Load more (${filtered.length - visiblePlugins.length} remaining)`)}</button>}
@@ -1011,6 +1211,7 @@ export function PluginHub({
               favorite={favorites.includes(selected.id)}
               copied={copied}
               related={relatedPlugins}
+              catalogHref={catalogHref}
               onCopy={copy}
               onFavorite={() => toggleFavorite(selected.id)}
               onShare={shareSelected}
@@ -1054,9 +1255,11 @@ export function PluginHub({
                 favorite={favorites.includes(selected.id)}
                 copied={copied}
                 related={relatedPlugins}
+                catalogHref={catalogHref}
                 onCopy={copy}
                 onFavorite={() => toggleFavorite(selected.id)}
                 onShare={shareSelected}
+                onOpenRelated={openPlugin}
               />
             </div>
           </aside>

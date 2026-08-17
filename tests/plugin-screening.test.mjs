@@ -14,6 +14,8 @@ import {
   screenRepository,
   selectFeaturedPlugins,
   selectRelatedPlugins,
+  normalizeOwnerParam,
+  catalogPageTitle,
   suggestedInstallCommand,
   displayInstallCommand,
   matchesSearchQuery,
@@ -76,6 +78,21 @@ test("prefers clear plugins in featured even when they have fewer stars", () => 
     { name: "clear-mid", stars: 30, screening: { state: "clear" } },
   ], 2);
   assert.deepEqual(featured.map((plugin) => plugin.name), ["clear-mid", "clear-quiet"]);
+});
+
+test("builds catalog titles from search, owner, and category", () => {
+  assert.equal(normalizeOwnerParam("SuperDesignDev"), "SuperDesignDev");
+  assert.equal(normalizeOwnerParam("bad owner"), "");
+  assert.equal(normalizeOwnerParam("../etc"), "");
+  assert.equal(catalogPageTitle({ query: "memory", lang: "zh", fallback: "插件目录" }), "搜索 memory");
+  assert.equal(catalogPageTitle({ query: "memory", lang: "en", fallback: "Plugin catalog" }), "Search memory");
+  assert.equal(catalogPageTitle({ owner: "omdsh-dev", lang: "zh", fallback: "插件目录" }), "omdsh-dev");
+  assert.equal(catalogPageTitle({
+    category: "memory",
+    lang: "zh",
+    categories: { memory: { zh: "记忆", en: "Memory" } },
+    fallback: "插件目录",
+  }), "记忆");
 });
 
 test("picks related plugins from the same category", () => {

@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 import type { CategoryId, PluginRecord, PluginRegistryData } from "@/lib/plugin-data";
-import { selectRelatedPlugins } from "@/lib/plugin-screening.mjs";
+import { catalogPageTitle, normalizeOwnerParam, selectRelatedPlugins } from "@/lib/plugin-screening.mjs";
 import { readPluginRegistryWithSource } from "@/worker/plugin-registry";
 import { PluginHub } from "../plugin-hub";
 import { jsonLdScript } from "../json-ld";
@@ -43,7 +43,7 @@ function rankingData(data: PluginRegistryData) {
   return { ...data, plugins };
 }
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { route } = await params;
   const lang = (await cookies()).get("dsh-plugin-hub-lang")?.value === "en" ? "en" : "zh";
   if (route[0] === "plugin" && route.length === 3) {
@@ -61,7 +61,24 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
   const details = pageDetails[route[0] as keyof typeof pageDetails];
   if (!details || route.length !== 1) return {};
-  const [title, description] = details[lang];
+  const [fallbackTitle, description] = details[lang];
+  let title = fallbackTitle;
+  if (details.page === "catalog") {
+    const filters = searchParams ? await searchParams : {};
+    const query = firstParam(filters.q);
+    const owner = firstParam(filters.owner);
+    const category = firstParam(filters.category);
+    const needsLabels = !query.trim() && !normalizeOwnerParam(owner) && category && category !== "all";
+    const { registry: data } = needsLabels ? await registry() : { registry: { categories: {} } };
+    title = catalogPageTitle({
+      query,
+      owner,
+      category,
+      lang,
+      categories: data.categories,
+      fallback: fallbackTitle,
+    });
+  }
   return {
     title,
     description,
@@ -89,6 +106,7 @@ export default async function RoutedHub({ params, searchParams }: Props) {
   const initialSort = ["evidence", "curated", "stars", "updated", "added", "name"].includes(requestedSort)
     ? requestedSort
     : "evidence";
+  const initialOwner = normalizeOwnerParam(firstParam(filters.owner));
   if (route[0] === "plugin" && route.length === 3) {
     const id = `${route[1]}/${route[2]}`.toLowerCase();
     const plugin = data.plugins.find((item) => item.id === id);
@@ -117,6 +135,7 @@ export default async function RoutedHub({ params, searchParams }: Props) {
       initialCategory={initialCategory as "all" | CategoryId}
       initialEvidence={initialEvidence as "all" | "auto" | "topic" | "manifest" | "clear" | "review" | "favorites"}
       initialSort={initialSort as "evidence" | "curated" | "stars" | "updated" | "added" | "name"}
+      initialOwner={initialOwner}
       initialSource={source === "node-file" ? "live" : "bundled"}
       initialLanguage={initialLanguage}
       initialTheme={initialTheme}

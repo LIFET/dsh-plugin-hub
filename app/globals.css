@@ -806,6 +806,53 @@ html:not([data-theme="dark"]) .hub[data-theme="light"] {
   backdrop-filter: blur(12px);
 }
 
+.search-combo {
+  position: relative;
+}
+
+.search-suggest {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18);
+}
+
+.search-suggest button {
+  display: grid;
+  width: 100%;
+  gap: 2px;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.search-suggest button.is-active,
+.search-suggest button:hover {
+  background: var(--surface-2);
+}
+
+.search-suggest strong {
+  font-size: 13px;
+}
+
+.search-suggest small {
+  color: var(--muted-2);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
 .search-field {
   display: flex;
   height: 46px;
@@ -1029,7 +1076,7 @@ main > .page-section {
   display: flex;
   width: 100%;
   gap: 22px;
-  padding: 22px 58px 22px 16px;
+  padding: 22px 88px 22px 16px;
   background: transparent;
   text-align: left;
   text-decoration: none;
@@ -1039,7 +1086,7 @@ main > .page-section {
   min-height: 250px;
   flex-direction: column;
   gap: 14px;
-  padding: 22px 46px 22px 22px;
+  padding: 22px 78px 22px 22px;
 }
 
 .plugin-card:hover {
@@ -1149,10 +1196,16 @@ main > .page-section {
   color: var(--red);
 }
 
-.favorite-button {
+.plugin-card__actions {
   position: absolute;
-  top: 20px;
-  right: 17px;
+  top: 16px;
+  right: 12px;
+  display: flex;
+  gap: 4px;
+}
+
+.copy-install,
+.favorite-button {
   width: 30px;
   height: 30px;
   border-radius: 8px;
@@ -1161,10 +1214,16 @@ main > .page-section {
   font-size: 15px;
 }
 
+.copy-install:hover,
 .favorite-button:hover,
 .favorite-button.is-active {
   background: var(--amber-soft);
   color: var(--amber) !important;
+}
+
+.copy-install:hover {
+  background: var(--brand-soft);
+  color: var(--brand-strong) !important;
 }
 
 .empty-state {
@@ -1192,6 +1251,21 @@ main > .page-section {
   border-radius: 8px;
   background: var(--brand-soft);
   color: var(--brand-strong);
+}
+
+.empty-state__hints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  max-width: 520px;
+  margin-top: 16px;
+}
+
+.empty-state__hints button {
+  background: var(--surface);
+  color: var(--muted);
+  border: 1px solid var(--line);
 }
 
 .rank-grid {
@@ -1585,9 +1659,22 @@ html:not([data-theme="dark"]) .hub[data-theme="light"] .code-panel {
   font-size: 10px;
 }
 
-.plugin-page__top a {
+.plugin-page__top a,
+.plugin-crumbs a,
+.drawer-owner a {
   color: var(--brand-strong);
   text-decoration: none;
+}
+
+.plugin-crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 0 0 6px;
+  color: var(--muted-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
 }
 
 .related-list {
@@ -1897,6 +1984,7 @@ html:not([data-theme="dark"]) .hub[data-theme="light"] .code-panel {
     grid-template-columns: 1fr 1fr;
   }
 
+  .search-combo,
   .search-field {
     grid-column: 1 / -1;
   }
@@ -1926,6 +2014,7 @@ html:not([data-theme="dark"]) .hub[data-theme="light"] .code-panel {
     font-size: 16px;
   }
 
+  .copy-install,
   .favorite-button {
     width: 44px;
     height: 44px;
