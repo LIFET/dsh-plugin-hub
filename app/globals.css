@@ -679,7 +679,7 @@ html:not([data-theme="dark"]) .hub[data-theme="light"] {
 
 .category-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
   gap: 10px;
 }
 
@@ -1688,10 +1688,16 @@ html:not([data-theme="dark"]) .hub[data-theme="light"] .code-panel {
   color: inherit;
 }
 
+.install-toggles {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 12px 0 0;
+}
+
 .profile-switch {
   display: flex;
   gap: 6px;
-  margin: 12px 0 0;
 }
 
 .profile-switch button {
@@ -1816,6 +1822,18 @@ html:not([data-theme="dark"]) .hub[data-theme="light"] .code-panel {
   color: var(--amber);
   font-size: 11px;
   line-height: 1.55;
+}
+
+.reason-list__item--info {
+  color: var(--muted);
+}
+
+.reason-list__item--info::before {
+  content: "i";
+}
+
+.reason-list__item--high {
+  color: var(--red);
 }
 
 .reason-list li::before {

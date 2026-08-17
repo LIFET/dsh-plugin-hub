@@ -205,11 +205,15 @@ function PluginDetail({
             ? text(lang, "静态检查尚未通过，因此不提供正式安装命令。下面是钉到已检查提交的建议命令，执行前请先核对完整源码。", "Static screening has not passed, so no official install command is shown. The suggestion below is pinned to the inspected commit; review the complete source first.")
             : text(lang, "当前证据不足或尚未完成源码检查，网站不提供正式安装命令。下面只是仓库级建议命令，执行前请先核对完整源码。", "Evidence is currently insufficient or the source scan is still pending, so no official install command is shown. The suggestion below is repository-level only; review the complete source first.")}</p>
         )}
-        <div className="profile-switch" role="group" aria-label={text(lang, "安装方式", "Install options")}>
-          <button className={profile === "web" ? "is-active" : ""} type="button" onClick={() => setProfile("web")}>web</button>
-          <button className={profile === "default" ? "is-active" : ""} type="button" onClick={() => setProfile("default")}>{text(lang, "默认", "default")}</button>
-          <button className={runner === "dsh" ? "is-active" : ""} type="button" onClick={() => setRunner("dsh")}>dsh</button>
-          <button className={runner === "npx" ? "is-active" : ""} type="button" onClick={() => setRunner("npx")}>npx</button>
+        <div className="install-toggles">
+          <div className="profile-switch" role="group" aria-label={text(lang, "安装 profile", "Install profile")}>
+            <button className={profile === "web" ? "is-active" : ""} type="button" onClick={() => setProfile("web")}>web</button>
+            <button className={profile === "default" ? "is-active" : ""} type="button" onClick={() => setProfile("default")}>{text(lang, "默认", "default")}</button>
+          </div>
+          <div className="profile-switch" role="group" aria-label={text(lang, "运行方式", "Runner")}>
+            <button className={runner === "dsh" ? "is-active" : ""} type="button" onClick={() => setRunner("dsh")}>dsh</button>
+            <button className={runner === "npx" ? "is-active" : ""} type="button" onClick={() => setRunner("npx")}>npx</button>
+          </div>
         </div>
         <div className="code-panel code-panel--drawer">
           <code>{command}</code>
@@ -232,7 +236,7 @@ function PluginDetail({
           <div><dt>{text(lang, "已读文件", "Files inspected")}</dt><dd>{plugin.screening.filesInspected.length ? plugin.screening.filesInspected.join(" · ") : "—"}</dd></div>
           <div><dt>{text(lang, "检查时间", "Checked at")}</dt><dd>{plugin.screening.checkedAt.slice(0, 16).replace("T", " ")} UTC</dd></div>
         </dl>
-        {plugin.screening.findings.length > 0 && <ul className="reason-list">{plugin.screening.findings.map((finding) => <li key={finding.id}>{finding.label[lang]}{finding.files.length ? ` · ${finding.files.join(", ")}` : ""}</li>)}</ul>}
+        {plugin.screening.findings.length > 0 && <ul className="reason-list">{plugin.screening.findings.map((finding) => <li className={`reason-list__item reason-list__item--${finding.severity}`} key={finding.id}>{finding.label[lang]}{finding.files.length ? ` · ${finding.files.join(", ")}` : ""}</li>)}</ul>}
       </div>
 
       <div className="drawer-actions">
@@ -297,6 +301,7 @@ function PluginCard({
           <span className="plugin-card__meta">
             <span>★ {formatNumber(plugin.stars, lang)}</span>
             <span>{relativeDate(plugin.pushedAt, lang)}</span>
+            {plugin.manifest.version && <span>v{plugin.manifest.version}</span>}
             <span>{plugin.license || text(lang, "无许可证", "No license")}</span>
             <span className={`signal signal--${plugin.attention.level}`}>{signalLabel(plugin, lang)}</span>
           </span>
@@ -450,9 +455,11 @@ export function PluginHub({
     if (page === "home" && !selected) document.title = site;
     else if (page === "catalog" && !selected) {
       const q = query.trim();
-      document.title = q ? `${q} · ${site}` : `${text(lang, "插件目录", "Plugin catalog")} · ${site}`;
+      const cat = category !== "all" ? data.categories[category]?.[lang] : "";
+      const label = q || cat || text(lang, "插件目录", "Plugin catalog");
+      document.title = `${label} · ${site}`;
     } else document.title = `${pageTitle} · ${site}`;
-  }, [lang, page, query, selected]);
+  }, [category, data.categories, lang, page, query, selected]);
 
   const rememberRecent = useCallback((plugin: PluginRecord) => {
     const item = { id: plugin.id, name: visiblePluginName(plugin), repo: plugin.repo };
@@ -562,17 +569,9 @@ export function PluginHub({
     }
   }, [lang, repositoryUrl]);
 
-  const computedCategoryCounts = useMemo(() => {
-    const counts = Object.fromEntries(CATEGORY_ORDER.map((id) => [id, 0])) as Record<CategoryId, number>;
-    for (const plugin of data.plugins) counts[plugin.category] += 1;
-    return counts;
-  }, [data.plugins]);
-  const categoryCounts = initialCategoryCounts || computedCategoryCounts;
-
-  const filtered = useMemo(() => {
+  const preCategory = useMemo(() => {
     const favoriteSet = new Set(favorites);
-    const rows = data.plugins.filter((plugin) => {
-      if (category !== "all" && plugin.category !== category) return false;
+    return data.plugins.filter((plugin) => {
       if (evidence === "auto" && plugin.curated) return false;
       if (evidence === "topic" && !plugin.topic) return false;
       if (evidence === "manifest" && plugin.manifest.state !== "verified") return false;
@@ -589,16 +588,30 @@ export function PluginHub({
         query,
       );
     });
+  }, [data.categories, data.plugins, evidence, favorites, query]);
 
+  const computedCategoryCounts = useMemo(() => {
+    const counts = Object.fromEntries(CATEGORY_ORDER.map((id) => [id, 0])) as Record<CategoryId, number>;
+    for (const plugin of (page === "catalog" ? preCategory : data.plugins)) {
+      if (plugin.category in counts) counts[plugin.category] += 1;
+    }
+    return counts;
+  }, [data.plugins, page, preCategory]);
+  const categoryCounts = page === "home" && initialCategoryCounts ? initialCategoryCounts : computedCategoryCounts;
+
+  const filtered = useMemo(() => {
+    const rows = category === "all" ? [...preCategory] : preCategory.filter((plugin) => plugin.category === category);
     return rows.sort((a, b) => {
       if (sort === "stars") return (b.stars ?? -1) - (a.stars ?? -1) || a.order - b.order;
       if (sort === "updated") return Date.parse(b.pushedAt || "0") - Date.parse(a.pushedAt || "0");
       if (sort === "added") return (b.added || "").localeCompare(a.added || "") || a.order - b.order;
-      if (sort === "name") return a.name.localeCompare(b.name);
+      if (sort === "name") {
+        return visiblePluginName(a).localeCompare(visiblePluginName(b), lang === "zh" ? "zh-CN" : "en", { sensitivity: "base" });
+      }
       if (sort === "curated") return a.order - b.order;
       return comparePluginsByEvidence(a, b);
     });
-  }, [category, data.categories, data.plugins, evidence, favorites, query, sort]);
+  }, [category, lang, preCategory, sort]);
 
   useEffect(() => {
     if (!preferencesReady || page !== "catalog" || selected) return;
@@ -838,7 +851,7 @@ export function PluginHub({
                     key={id}
                   >
                     <strong>{categoryCounts[id]}</strong>
-                    <span>{data.categories[id][lang]}</span>
+                    <span>{data.categories[id]?.[lang] || id}</span>
                     <small>{CATEGORY_HINTS[id][lang]}</small>
                   </Link>
                 ))}
@@ -864,7 +877,7 @@ export function PluginHub({
         {page === "catalog" && (
           <section className="catalog shell page-section">
             <div className="page-heading">
-              <div><span className="section-kicker">CATALOG</span><h1>{text(lang, "插件目录", "Plugin catalog")}</h1><p aria-live="polite">{text(lang, `${filtered.length} 个结果 · 数据生成于 ${generatedLabel}`, `${filtered.length} results · generated ${generatedLabel}`)}</p></div>
+              <div><span className="section-kicker">CATALOG</span><h1>{category === "all" ? text(lang, "插件目录", "Plugin catalog") : (data.categories[category]?.[lang] || text(lang, "插件目录", "Plugin catalog"))}</h1><p aria-live="polite">{text(lang, `${filtered.length} 个结果 · 数据生成于 ${generatedLabel}`, `${filtered.length} results · generated ${generatedLabel}`)}</p></div>
             </div>
             {recent.length > 0 && (
               <ul className="recent-list">
@@ -916,7 +929,7 @@ export function PluginHub({
               </div>
             )}
             <div className="category-chips">
-              <button className={category === "all" ? "is-active" : ""} type="button" onClick={() => setCategory("all")} aria-pressed={category === "all"}>{text(lang, "全部", "All")} <small>{data.summary.listed}</small></button>
+              <button className={category === "all" ? "is-active" : ""} type="button" onClick={() => setCategory("all")} aria-pressed={category === "all"}>{text(lang, "全部", "All")} <small>{preCategory.length}</small></button>
               {CATEGORY_ORDER.map((id) => (
                 <button className={category === id ? "is-active" : ""} type="button" key={id} onClick={() => setCategory(id)} aria-pressed={category === id}>{data.categories[id][lang]} <small>{categoryCounts[id]}</small></button>
               ))}
