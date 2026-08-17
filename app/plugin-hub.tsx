@@ -6,7 +6,7 @@ import type {
   PluginRecord,
   PluginRegistryData,
 } from "@/lib/plugin-data";
-import { comparePluginsByEvidence, displayDescription, displayInstallCommand, suggestedInstallCommand, visiblePluginName } from "@/lib/plugin-screening.mjs";
+import { comparePluginsByEvidence, displayDescription, displayInstallCommand, matchesSearchQuery, pluginSearchHaystack, suggestedInstallCommand, visiblePluginName, withPackageRunner } from "@/lib/plugin-screening.mjs";
 import Link from "next/link";
 import { type FormEvent, type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -24,20 +24,26 @@ const PAGES: Array<{ id: Exclude<PageId, "plugin">; zh: string; en: string }> = 
 
 const CATEGORY_ORDER: CategoryId[] = [
   "ui",
+  "theme",
   "session",
+  "memory",
   "tools",
   "workflow",
   "notify",
+  "model",
   "dev",
   "fun",
 ];
 
 const CATEGORY_HINTS: Record<CategoryId, Record<Language, string>> = {
   ui: { zh: "侧栏、面板、交互体验", en: "Panels, navigation, interaction" },
+  theme: { zh: "皮肤、配色、外观", en: "Skins, colors, appearance" },
   session: { zh: "记忆、回退、分享、导入", en: "Memory, rewind, sharing, import" },
+  memory: { zh: "长期记忆、知识库", en: "Long-term memory, knowledge" },
   tools: { zh: "视觉、文档、数据库、工具箱", en: "Vision, docs, databases, toolkits" },
   workflow: { zh: "多代理、定时任务、监视", en: "Multi-agent, schedules, watches" },
   notify: { zh: "桌面通知、IM、编辑器桥接", en: "Desktop, IM, editor bridges" },
+  model: { zh: "模型、账号、供应商", en: "Models, accounts, providers" },
   dev: { zh: "沙箱、模型、运行时、体检", en: "Sandbox, models, runtime, audits" },
   fun: { zh: "桌宠、小游戏、贴纸", en: "Pets, minigames, stickers" },
 };
@@ -136,7 +142,7 @@ function sourceClass(plugin: PluginRecord) {
 }
 
 function highlightMatch(value: string, query: string) {
-  const needle = query.trim();
+  const needle = query.trim().split(/\s+/u)[0] || "";
   if (!needle) return value;
   const index = value.toLowerCase().indexOf(needle.toLowerCase());
   if (index < 0) return value;
@@ -172,7 +178,8 @@ function PluginDetail({
 }) {
   const suggested = suggestedInstallCommand(plugin);
   const [profile, setProfile] = useState<"web" | "default">("web");
-  const command = displayInstallCommand(plugin.installCommand || suggested, profile);
+  const [runner, setRunner] = useState<"dsh" | "npx">("dsh");
+  const command = withPackageRunner(displayInstallCommand(plugin.installCommand || suggested, profile), runner);
   return (
     <>
       <div className="plugin-drawer__badges">
@@ -198,9 +205,11 @@ function PluginDetail({
             ? text(lang, "静态检查尚未通过，因此不提供正式安装命令。下面是钉到已检查提交的建议命令，执行前请先核对完整源码。", "Static screening has not passed, so no official install command is shown. The suggestion below is pinned to the inspected commit; review the complete source first.")
             : text(lang, "当前证据不足或尚未完成源码检查，网站不提供正式安装命令。下面只是仓库级建议命令，执行前请先核对完整源码。", "Evidence is currently insufficient or the source scan is still pending, so no official install command is shown. The suggestion below is repository-level only; review the complete source first.")}</p>
         )}
-        <div className="profile-switch" role="group" aria-label={text(lang, "安装 profile", "Install profile")}>
+        <div className="profile-switch" role="group" aria-label={text(lang, "安装方式", "Install options")}>
           <button className={profile === "web" ? "is-active" : ""} type="button" onClick={() => setProfile("web")}>web</button>
           <button className={profile === "default" ? "is-active" : ""} type="button" onClick={() => setProfile("default")}>{text(lang, "默认", "default")}</button>
+          <button className={runner === "dsh" ? "is-active" : ""} type="button" onClick={() => setRunner("dsh")}>dsh</button>
+          <button className={runner === "npx" ? "is-active" : ""} type="button" onClick={() => setRunner("npx")}>npx</button>
         </div>
         <div className="code-panel code-panel--drawer">
           <code>{command}</code>
@@ -215,7 +224,7 @@ function PluginDetail({
           <div><dt>{text(lang, "检查范围", "Coverage")}</dt><dd>{plugin.screening.scope === "source" ? text(lang, "manifest + 声明入口源码", "manifest + declared source") : text(lang, "仅 manifest，等待补扫", "manifest only; source pending")}</dd></div>
           <div><dt>Manifest</dt><dd>{plugin.manifest.state === "verified" ? `${plugin.manifest.kinds.join(" · ")} · ${plugin.manifest.packageName || "package"}` : plugin.manifest.state}</dd></div>
           <div><dt>{text(lang, "版本", "Version")}</dt><dd>{plugin.manifest.version || "—"}</dd></div>
-          <div><dt>{text(lang, "已检查提交", "Screened commit")}</dt><dd>{plugin.screenedCommit?.slice(0, 12) || "—"}</dd></div>
+          <div><dt>{text(lang, "已检查提交", "Screened commit")}</dt><dd>{plugin.screenedCommit ? <button className="commit-copy" type="button" onClick={() => onCopy(plugin.screenedCommit || "", `${plugin.id}-commit`)}>{copied === `${plugin.id}-commit` ? text(lang, "已复制", "Copied") : plugin.screenedCommit.slice(0, 12)}</button> : "—"}</dd></div>
           <div><dt>{text(lang, "运行依赖", "Runtime deps")}</dt><dd>{plugin.manifest.runtimeDependencies}</dd></div>
           <div><dt>{text(lang, "生命周期脚本", "Lifecycle scripts")}</dt><dd>{plugin.manifest.lifecycleScripts.length ? plugin.manifest.lifecycleScripts.join(", ") : text(lang, "未发现", "None found")}</dd></div>
           <div><dt>{text(lang, "维护状态", "Maintenance")}</dt><dd>{maintenanceLabel(plugin, lang)}</dd></div>
@@ -437,10 +446,13 @@ export function PluginHub({
 
   useEffect(() => {
     const pageTitle = selected ? visiblePluginName(selected) : PAGES.find((item) => item.id === page)?.[lang] || "DSH";
-    document.title = page === "home" && !selected
-      ? text(lang, "DSH 插件资源站", "DSH Plugin Hub")
-      : `${pageTitle} · ${text(lang, "DSH 插件资源站", "DSH Plugin Hub")}`;
-  }, [lang, page, selected]);
+    const site = text(lang, "DSH 插件资源站", "DSH Plugin Hub");
+    if (page === "home" && !selected) document.title = site;
+    else if (page === "catalog" && !selected) {
+      const q = query.trim();
+      document.title = q ? `${q} · ${site}` : `${text(lang, "插件目录", "Plugin catalog")} · ${site}`;
+    } else document.title = `${pageTitle} · ${site}`;
+  }, [lang, page, query, selected]);
 
   const rememberRecent = useCallback((plugin: PluginRecord) => {
     const item = { id: plugin.id, name: visiblePluginName(plugin), repo: plugin.repo };
@@ -558,7 +570,6 @@ export function PluginHub({
   const categoryCounts = initialCategoryCounts || computedCategoryCounts;
 
   const filtered = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
     const favoriteSet = new Set(favorites);
     const rows = data.plugins.filter((plugin) => {
       if (category !== "all" && plugin.category !== category) return false;
@@ -568,19 +579,15 @@ export function PluginHub({
       if (evidence === "clear" && plugin.screening.state !== "clear") return false;
       if (evidence === "review" && !["review", "pending", "blocked"].includes(plugin.screening.state)) return false;
       if (evidence === "favorites" && !favoriteSet.has(plugin.id)) return false;
-      if (!normalized) return true;
-      return [
-        plugin.name,
-        plugin.owner,
-        plugin.repo,
-        plugin.description.zh,
-        plugin.description.en,
-        data.categories[plugin.category].zh,
-        plugin.manifest.packageName || "",
-      ]
-        .join(" ")
-        .toLowerCase()
-        .includes(normalized);
+      return matchesSearchQuery(
+        pluginSearchHaystack(plugin, [
+          data.categories[plugin.category]?.zh || "",
+          data.categories[plugin.category]?.en || "",
+          CATEGORY_HINTS[plugin.category]?.zh || "",
+          CATEGORY_HINTS[plugin.category]?.en || "",
+        ]),
+        query,
+      );
     });
 
     return rows.sort((a, b) => {
@@ -609,6 +616,11 @@ export function PluginHub({
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && page === "catalog" && query.trim()) {
+        event.preventDefault();
+        setQuery("");
+        return;
+      }
       if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey) return;
       const target = event.target;
       if (target instanceof HTMLElement && ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) return;
@@ -619,7 +631,7 @@ export function PluginHub({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [page]);
+  }, [page, query]);
 
   const relatedPlugins = useMemo(
     () => data.plugins.filter((plugin) => relatedPluginIds.includes(plugin.id)),
@@ -757,7 +769,7 @@ export function PluginHub({
                       value={homeQuery}
                       onChange={(event) => setHomeQuery(event.target.value)}
                       aria-label={text(lang, "搜索插件", "Search plugins")}
-                      placeholder={text(lang, "搜索名称、作者、能力或包名", "Search name, author, capability, package")}
+                      placeholder={text(lang, "搜索名称、作者、仓库或能力，按 / 聚焦", "Search name, author, repo, or capability. Press /")}
                     />
                   </label>
                   <button className="primary-button" type="submit">{text(lang, "搜索插件", "Search plugins")}</button>
@@ -852,7 +864,7 @@ export function PluginHub({
         {page === "catalog" && (
           <section className="catalog shell page-section">
             <div className="page-heading">
-              <div><span className="section-kicker">CATALOG</span><h1>{text(lang, "插件目录", "Plugin catalog")}</h1><p>{text(lang, `${filtered.length} 个结果 · 数据生成于 ${generatedLabel}`, `${filtered.length} results · generated ${generatedLabel}`)}</p></div>
+              <div><span className="section-kicker">CATALOG</span><h1>{text(lang, "插件目录", "Plugin catalog")}</h1><p aria-live="polite">{text(lang, `${filtered.length} 个结果 · 数据生成于 ${generatedLabel}`, `${filtered.length} results · generated ${generatedLabel}`)}</p></div>
             </div>
             {recent.length > 0 && (
               <ul className="recent-list">
@@ -864,7 +876,7 @@ export function PluginHub({
             <div className="catalog-toolbar">
               <label className="search-field">
                 <span>/</span>
-                <input name="q" value={query} onChange={(event) => setQuery(event.target.value)} aria-label={text(lang, "搜索插件", "Search plugins")} placeholder={text(lang, "搜索名称、作者、能力或包名", "Search name, author, capability, package")} />
+                <input name="q" value={query} onChange={(event) => setQuery(event.target.value)} aria-label={text(lang, "搜索插件", "Search plugins")} placeholder={text(lang, "搜索名称、作者、仓库或能力，Esc 清空", "Search name, author, repo, or capability. Esc clears")} />
                 {query && <button type="button" onClick={() => setQuery("")} aria-label={text(lang, "清空搜索", "Clear search")}>×</button>}
               </label>
               <select value={evidence} onChange={(event) => setEvidence(event.target.value as EvidenceFilter)} aria-label={text(lang, "证据筛选", "Evidence filter")}>
@@ -925,7 +937,11 @@ export function PluginHub({
                 ))}
               </div>
             ) : (
-              <div className="empty-state"><strong>{text(lang, "没有匹配的插件", "No matching plugins")}</strong><p>{text(lang, "换个关键词或清空筛选条件。", "Try another keyword or reset the filters.")}</p><button type="button" onClick={() => { setQuery(""); setCategory("all"); setEvidence("all"); }}>{text(lang, "清空筛选", "Reset filters")}</button></div>
+              <div className="empty-state">
+                <strong>{evidence === "favorites" && favorites.length === 0 ? text(lang, "还没有收藏", "No saved plugins yet") : text(lang, "没有匹配的插件", "No matching plugins")}</strong>
+                <p>{evidence === "favorites" && favorites.length === 0 ? text(lang, "在卡片右侧点星标，就能在这里集中查看。", "Tap the star on a card to save it here.") : text(lang, "换个关键词或清空筛选条件。", "Try another keyword or reset the filters.")}</p>
+                <button type="button" onClick={() => { setQuery(""); setCategory("all"); setEvidence("all"); }}>{text(lang, "清空筛选", "Reset filters")}</button>
+              </div>
             )}
             {hasMore && <button ref={loadMoreRef} className="load-more" type="button" onClick={() => setVisibleWindow({ key: filterKey, count: visibleCount + RESULT_BATCH_SIZE })}>{text(lang, `加载更多（还有 ${filtered.length - visiblePlugins.length} 个）`, `Load more (${filtered.length - visiblePlugins.length} remaining)`)}</button>}
           </section>

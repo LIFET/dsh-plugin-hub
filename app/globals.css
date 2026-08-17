@@ -1711,6 +1711,16 @@ html:not([data-theme="dark"]) .hub[data-theme="light"] .code-panel {
   color: var(--brand-strong);
 }
 
+.commit-copy {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--brand-strong);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .drawer-owner {
   margin: 10px 0 0;
   color: var(--muted);

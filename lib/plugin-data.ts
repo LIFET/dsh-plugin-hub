@@ -4,10 +4,13 @@ import { sanitizeRegistryInstallEvidence } from "@/lib/plugin-screening.mjs";
 export type Language = "zh" | "en";
 export type CategoryId =
   | "ui"
+  | "theme"
   | "session"
+  | "memory"
   | "tools"
   | "workflow"
   | "notify"
+  | "model"
   | "dev"
   | "fun";
 

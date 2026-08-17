@@ -78,7 +78,7 @@ export default async function RoutedHub({ params, searchParams }: Props) {
   const { registry: data, source } = await registry();
   const initialQuery = firstParam(filters.q);
   const requestedCategory = firstParam(filters.category);
-  const initialCategory = requestedCategory === "all" || ["ui", "session", "tools", "workflow", "notify", "dev", "fun"].includes(requestedCategory)
+  const initialCategory = requestedCategory === "all" || ["ui", "theme", "session", "memory", "tools", "workflow", "notify", "model", "dev", "fun"].includes(requestedCategory)
     ? requestedCategory
     : "all";
   const requestedEvidence = firstParam(filters.evidence);

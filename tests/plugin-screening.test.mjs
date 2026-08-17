@@ -16,6 +16,9 @@ import {
   selectRelatedPlugins,
   suggestedInstallCommand,
   displayInstallCommand,
+  matchesSearchQuery,
+  pluginSearchHaystack,
+  withPackageRunner,
   visiblePluginName,
   displayDescription,
   inspectionQueuePriority,
@@ -114,6 +117,24 @@ test("suggests a commit-pinned command when a screened commit exists", () => {
     displayInstallCommand("dsh plugin --profile web add github:owner/plugin#abc", "default"),
     "dsh plugin add github:owner/plugin#abc",
   );
+  assert.equal(
+    withPackageRunner("dsh plugin --profile web add github:owner/plugin", "npx"),
+    "npx @deepseek-ai/dsh plugin --profile web add github:owner/plugin",
+  );
+});
+
+test("matches multi-word plugin searches against repo and category hints", () => {
+  const haystack = pluginSearchHaystack({
+    name: "DSH-better-sidebar",
+    owner: "omdsh-dev",
+    repo: "omdsh-dev/DSH-better-sidebar",
+    description: { zh: "更好的侧栏", en: "Better sidebar" },
+    manifest: { packageName: "dsh-better-sidebar" },
+    screening: { findings: [] },
+  }, ["侧栏", "panels"]);
+  assert.equal(matchesSearchQuery(haystack, "better sidebar"), true);
+  assert.equal(matchesSearchQuery(haystack, "侧栏"), true);
+  assert.equal(matchesSearchQuery(haystack, "sidebar missingterm"), false);
 });
 
 const safeMeta = {
