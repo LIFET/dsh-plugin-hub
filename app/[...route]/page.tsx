@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 import type { PluginRecord, PluginRegistryData } from "@/lib/plugin-data";
+import { selectRelatedPlugins } from "@/lib/plugin-screening.mjs";
 import { readPluginRegistryWithSource } from "@/worker/plugin-registry";
 import { PluginHub } from "../plugin-hub";
 import { jsonLdScript } from "../json-ld";
@@ -74,11 +75,12 @@ export default async function RoutedHub({ params }: Props) {
     const id = `${route[1]}/${route[2]}`.toLowerCase();
     const plugin = data.plugins.find((item) => item.id === id);
     if (!plugin) notFound();
-    const slim: PluginRegistryData = { ...data, plugins: [plugin] };
+    const related = selectRelatedPlugins(data.plugins, plugin, 3);
+    const slim: PluginRegistryData = { ...data, plugins: [plugin, ...related] };
     return (
       <>
         {jsonLdScript(pluginJsonLd(plugin, initialLanguage))}
-        <PluginHub data={slim} initialPage="plugin" initialPluginId={id} initialSource={source === "node-file" ? "live" : "bundled"} initialLanguage={initialLanguage} initialTheme={initialTheme} />
+        <PluginHub data={slim} initialPage="plugin" initialPluginId={id} relatedPluginIds={related.map((item) => item.id)} initialSource={source === "node-file" ? "live" : "bundled"} initialLanguage={initialLanguage} initialTheme={initialTheme} />
       </>
     );
   }

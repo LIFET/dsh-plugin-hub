@@ -781,11 +781,17 @@ html:not([data-theme="dark"]) .hub[data-theme="light"] {
 }
 
 .catalog-toolbar {
+  position: sticky;
+  top: 68px;
+  z-index: 20;
   display: grid;
   grid-template-columns: minmax(280px, 1fr) auto auto auto;
   gap: 10px;
   align-items: center;
-  margin-bottom: 14px;
+  margin: 0 -8px 14px;
+  padding: 10px 8px;
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  backdrop-filter: blur(12px);
 }
 
 .search-field {
@@ -1572,6 +1578,53 @@ html:not([data-theme="dark"]) .hub[data-theme="light"] .code-panel {
   text-decoration: none;
 }
 
+.related-list {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.related-list a {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 48px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  text-decoration: none;
+}
+
+.related-list a:hover {
+  background: var(--surface-2);
+}
+
+.related-list strong {
+  display: block;
+  font-size: 14px;
+}
+
+.related-list small {
+  display: block;
+  color: var(--muted-2);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.related-list li a {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 12px;
+}
+
+.related-list small {
+  grid-column: 1;
+}
+
 .drawer-owner {
   margin: 10px 0 0;
   color: var(--muted);
@@ -1726,6 +1779,7 @@ html:not([data-theme="dark"]) .hub[data-theme="light"] .code-panel {
   }
 
   .catalog-toolbar {
+    top: 60px;
     grid-template-columns: 1fr 1fr;
   }
 

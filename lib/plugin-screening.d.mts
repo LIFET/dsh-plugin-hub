@@ -6,6 +6,7 @@ export function resolveRegistryScanLimit(input?: { token?: string; requested?: s
 export function suggestedInstallCommand(plugin: { repo?: string; screenedCommit?: string | null }): string;
 export function visiblePluginName(plugin: { name?: string; repo?: string }): string;
 export function selectFeaturedPlugins<T>(plugins: T[], limit?: number): T[];
+export function selectRelatedPlugins<T>(plugins: T[], current: T | null | undefined, limit?: number): T[];
 export function inspectionQueuePriority(previous: { screening?: { scope?: string } } | null | undefined): number;
 
 export interface ScreeningManifest {

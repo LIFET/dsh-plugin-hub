@@ -43,6 +43,7 @@ const CATEGORY_HINTS: Record<CategoryId, Record<Language, string>> = {
 };
 
 const PREFS_KEY = "dsh-plugin-hub-prefs-v2";
+const CATALOG_RETURN_KEY = "dsh-plugin-hub-catalog-return";
 const RESULT_BATCH_SIZE = 36;
 const PAGE_PATHS: Record<Exclude<PageId, "plugin">, string> = {
   home: "/",
@@ -139,16 +140,20 @@ function PluginDetail({
   categoryLabel,
   favorite,
   copied,
+  related,
   onCopy,
   onFavorite,
+  onShare,
 }: {
   plugin: PluginRecord;
   lang: Language;
   categoryLabel: string;
   favorite: boolean;
-  copied: boolean;
+  copied: string | null;
+  related: PluginRecord[];
   onCopy: (value: string, id: string) => void;
   onFavorite: () => void;
+  onShare: () => void;
 }) {
   const suggested = suggestedInstallCommand(plugin);
   return (
@@ -174,7 +179,7 @@ function PluginDetail({
             <p>{text(lang, "命令已锁定到完成检查的 Git commit；执行前仍建议阅读完整源码。", "The command is pinned to the inspected Git commit. Review the complete source before running it.")}</p>
             <div className="code-panel code-panel--drawer">
               <code>{plugin.installCommand}</code>
-              <button type="button" onClick={() => onCopy(plugin.installCommand || "", plugin.id)}>{copied ? text(lang, "已复制", "Copied") : text(lang, "复制", "Copy")}</button>
+              <button type="button" onClick={() => onCopy(plugin.installCommand || "", plugin.id)}>{copied === plugin.id ? text(lang, "已复制", "Copied") : text(lang, "复制", "Copy")}</button>
             </div>
           </>
         ) : (
@@ -184,7 +189,7 @@ function PluginDetail({
               : text(lang, "当前证据不足或尚未完成源码检查，网站不提供正式安装命令。下面只是仓库级建议命令，执行前请先核对完整源码。", "Evidence is currently insufficient or the source scan is still pending, so no official install command is shown. The suggestion below is repository-level only; review the complete source first.")}</p>
             <div className="code-panel code-panel--drawer">
               <code>{suggested}</code>
-              <button type="button" onClick={() => onCopy(suggested, plugin.id)}>{copied ? text(lang, "已复制", "Copied") : text(lang, "复制", "Copy")}</button>
+              <button type="button" onClick={() => onCopy(suggested, plugin.id)}>{copied === plugin.id ? text(lang, "已复制", "Copied") : text(lang, "复制", "Copy")}</button>
             </div>
           </>
         )}
@@ -210,8 +215,28 @@ function PluginDetail({
 
       <div className="drawer-actions">
         <a className="primary-button" href={plugin.url} target="_blank" rel="noreferrer">{text(lang, "在 GitHub 打开", "Open on GitHub")} ↗</a>
+        {plugin.homepage && /^https?:\/\//u.test(plugin.homepage) && (
+          <a className="secondary-button" href={plugin.homepage} target="_blank" rel="noreferrer">{text(lang, "打开主页", "Open homepage")} ↗</a>
+        )}
         <button className={`secondary-button ${favorite ? "is-active" : ""}`} type="button" onClick={onFavorite}>★ {text(lang, favorite ? "已收藏" : "收藏", favorite ? "Saved" : "Save")}</button>
+        <button className="secondary-button" type="button" onClick={onShare}>{copied === `${plugin.id}-link` ? text(lang, "链接已复制", "Link copied") : text(lang, "分享链接", "Share link")}</button>
       </div>
+      {related.length > 0 && (
+        <div className="drawer-section">
+          <span className="drawer-label">{text(lang, "同类插件", "RELATED PLUGINS")}</span>
+          <ul className="related-list">
+            {related.map((item) => (
+              <li key={item.id}>
+                <Link href={pluginPath(item)} prefetch={false}>
+                  <strong>{visiblePluginName(item)}</strong>
+                  <small>{item.repo}</small>
+                  <span className={`signal signal--${item.attention.level}`}>{signalLabel(item, lang)}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <p className="drawer-disclaimer">{text(lang, "自动检查覆盖有限文件和规则，可能漏报，也可能误报。安装插件仍会在你的机器上执行第三方代码；高权限项目请放进独立 profile 与临时工作区验证。", "Automated screening covers a limited set of files and rules, so false negatives and false positives remain possible. Plugins still execute third-party code on your machine; test high-authority projects in an isolated profile and disposable workspace.")}</p>
     </>
   );
@@ -275,6 +300,7 @@ export function PluginHub({
   initialTheme = "light",
   initialCategoryCounts,
   initialInspectedCount,
+  relatedPluginIds = [],
 }: {
   data: PluginRegistryData;
   initialPage?: PageId;
@@ -284,6 +310,7 @@ export function PluginHub({
   initialTheme?: "dark" | "light";
   initialCategoryCounts?: Record<CategoryId, number>;
   initialInspectedCount?: number;
+  relatedPluginIds?: string[];
 }) {
   const data = initialData;
   const [registrySource] = useState<"bundled" | "live">(initialSource);
@@ -295,6 +322,7 @@ export function PluginHub({
   const [category, setCategory] = useState<"all" | CategoryId>("all");
   const [sort, setSort] = useState<SortId>("evidence");
   const [homeQuery, setHomeQuery] = useState("");
+  const [catalogHref, setCatalogHref] = useState("/plugins");
   const [view, setView] = useState<"list" | "cards">("list");
   const [evidence, setEvidence] = useState<EvidenceFilter>("all");
   const [favorites, setFavorites] = useState<string[]>([]);
@@ -345,7 +373,10 @@ export function PluginHub({
         if (saved.lang === "zh" || saved.lang === "en") setLang(saved.lang);
         if (saved.theme === "dark" || saved.theme === "light") setTheme(saved.theme);
         if (saved.view === "list" || saved.view === "cards") setView(saved.view);
+        else if (window.matchMedia("(max-width: 760px)").matches) setView("list");
         if (Array.isArray(saved.favorites)) setFavorites(saved.favorites);
+        const catalogReturn = sessionStorage.getItem(CATALOG_RETURN_KEY);
+        if (catalogReturn?.startsWith("/plugins")) setCatalogHref(catalogReturn);
       } catch {
         // Keep defaults when a browser contains malformed old preferences.
       } finally {
@@ -524,8 +555,44 @@ export function PluginHub({
     if (sort !== "evidence") params.set("sort", sort);
     if (evidence !== "all") params.set("evidence", evidence);
     const search = params.toString();
-    window.history.replaceState(null, "", `${PAGE_PATHS.catalog}${search ? `?${search}` : ""}`);
+    const next = `${PAGE_PATHS.catalog}${search ? `?${search}` : ""}`;
+    window.history.replaceState(null, "", next);
+    try { sessionStorage.setItem(CATALOG_RETURN_KEY, next); } catch { /* optional */ }
+    setCatalogHref(next);
   }, [category, evidence, page, preferencesReady, query, selected, sort]);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey) return;
+      const target = event.target;
+      if (target instanceof HTMLElement && ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) return;
+      const input = document.querySelector<HTMLInputElement>(page === "home" ? ".hero-search input" : ".catalog-toolbar input");
+      if (!input) return;
+      event.preventDefault();
+      input.focus();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [page]);
+
+  const relatedPlugins = useMemo(
+    () => data.plugins.filter((plugin) => relatedPluginIds.includes(plugin.id)),
+    [data.plugins, relatedPluginIds],
+  );
+
+  const shareSelected = useCallback(async () => {
+    if (!selected) return;
+    const url = `${window.location.origin}${pluginPath(selected)}`;
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({ title: visiblePluginName(selected), url });
+        return;
+      } catch {
+        // Fall through to clipboard copy when the share sheet is dismissed or unavailable.
+      }
+    }
+    copy(url, `${selected.id}-link`);
+  }, [copy, selected]);
 
   const filterKey = `${query}\u0000${category}\u0000${sort}\u0000${evidence}`;
   const visibleCount = visibleWindow.key === filterKey ? visibleWindow.count : RESULT_BATCH_SIZE;
@@ -630,8 +697,8 @@ export function PluginHub({
                   <button className="primary-button" type="submit">{text(lang, "搜索插件", "Search plugins")}</button>
                 </form>
                 <div className="hero__actions">
-                  <Link className="primary-button" href="/plugins" prefetch={false}>{text(lang, "浏览插件目录", "Browse catalog")} <span>→</span></Link>
-                  <a className="secondary-button" href={data.sources.curated.repository} target="_blank" rel="noreferrer">{text(lang, "查看数据源", "Open data source")} ↗</a>
+                  <Link className="secondary-button" href="/plugins" prefetch={false}>{text(lang, "浏览全部插件", "Browse all plugins")}</Link>
+                  <a className="text-button" href={data.sources.curated.repository} target="_blank" rel="noreferrer">{text(lang, "查看数据源", "Open data source")} ↗</a>
                 </div>
                 <details className="scan-status">
                   <summary><span className={`status-dot status-dot--${data.automation.state}`} />{automationLabel}</summary>
@@ -713,7 +780,7 @@ export function PluginHub({
             <div className="catalog-toolbar">
               <label className="search-field">
                 <span>/</span>
-                <input value={query} onChange={(event) => setQuery(event.target.value)} aria-label={text(lang, "搜索插件", "Search plugins")} placeholder={text(lang, "搜索名称、作者、能力或包名", "Search name, author, capability, package")} />
+                <input name="q" value={query} onChange={(event) => setQuery(event.target.value)} aria-label={text(lang, "搜索插件", "Search plugins")} placeholder={text(lang, "搜索名称、作者、能力或包名", "Search name, author, capability, package")} />
                 {query && <button type="button" onClick={() => setQuery("")} aria-label={text(lang, "清空搜索", "Clear search")}>×</button>}
               </label>
               <select value={evidence} onChange={(event) => setEvidence(event.target.value as EvidenceFilter)} aria-label={text(lang, "证据筛选", "Evidence filter")}>
@@ -807,16 +874,18 @@ export function PluginHub({
           <section className="shell page-section plugin-page">
             <div className="plugin-page__top">
               <span>PLUGIN {String(selected.order + 1).padStart(3, "0")}</span>
-              <Link href="/plugins" prefetch={false}>{text(lang, "返回目录", "Back to catalog")} →</Link>
+              <Link href={catalogHref} prefetch={false}>{text(lang, "返回目录", "Back to catalog")} →</Link>
             </div>
             <PluginDetail
               plugin={selected}
               lang={lang}
               categoryLabel={data.categories[selected.category][lang]}
               favorite={favorites.includes(selected.id)}
-              copied={copied === selected.id}
+              copied={copied}
+              related={relatedPlugins}
               onCopy={copy}
               onFavorite={() => toggleFavorite(selected.id)}
+              onShare={shareSelected}
             />
           </section>
         )}
@@ -855,9 +924,11 @@ export function PluginHub({
                 lang={lang}
                 categoryLabel={data.categories[selected.category][lang]}
                 favorite={favorites.includes(selected.id)}
-                copied={copied === selected.id}
+                copied={copied}
+                related={relatedPlugins}
                 onCopy={copy}
                 onFavorite={() => toggleFavorite(selected.id)}
+                onShare={shareSelected}
               />
             </div>
           </aside>

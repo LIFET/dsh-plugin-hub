@@ -13,6 +13,7 @@ import {
   sanitizeRegistryInstallEvidence,
   screenRepository,
   selectFeaturedPlugins,
+  selectRelatedPlugins,
   suggestedInstallCommand,
   visiblePluginName,
   inspectionQueuePriority,
@@ -60,7 +61,28 @@ test("selects featured plugins without blocked entries", () => {
     { name: "clear-mid", stars: 40, screening: { state: "clear" } },
     { name: "review-high", stars: 80, screening: { state: "review" } },
   ], 2);
-  assert.deepEqual(featured.map((plugin) => plugin.name), ["review-high", "clear-mid"]);
+  assert.deepEqual(featured.map((plugin) => plugin.name), ["clear-mid", "review-high"]);
+});
+
+test("prefers clear plugins in featured even when they have fewer stars", () => {
+  const featured = selectFeaturedPlugins([
+    { name: "review-hot", stars: 500, screening: { state: "review" } },
+    { name: "clear-quiet", stars: 12, screening: { state: "clear" } },
+    { name: "clear-mid", stars: 30, screening: { state: "clear" } },
+  ], 2);
+  assert.deepEqual(featured.map((plugin) => plugin.name), ["clear-mid", "clear-quiet"]);
+});
+
+test("picks related plugins from the same category", () => {
+  const current = { id: "a/one", category: "tools", screening: { state: "clear" }, stars: 1 };
+  const related = selectRelatedPlugins([
+    current,
+    { id: "b/two", category: "tools", screening: { state: "clear" }, stars: 9 },
+    { id: "c/three", category: "ui", screening: { state: "clear" }, stars: 20 },
+    { id: "d/four", category: "tools", screening: { state: "blocked" }, stars: 80 },
+    { id: "e/five", category: "tools", screening: { state: "review" }, stars: 3 },
+  ], current, 3);
+  assert.deepEqual(related.map((plugin) => plugin.id), ["b/two", "e/five"]);
 });
 
 test("strips npm scopes from visible plugin names", () => {
