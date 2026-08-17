@@ -7,15 +7,16 @@ export default function ErrorPage({ error, reset }: { error: Error & { digest?: 
   useEffect(() => {
     console.error("DSH Plugin Hub route error", error.digest || "unknown");
   }, [error]);
+  const english = typeof document !== "undefined" && document.documentElement.lang.startsWith("en");
 
   return (
     <main className="status-page">
       <span className="section-kicker">ERROR</span>
-      <h1>页面暂时无法加载</h1>
-      <p>数据读取出现异常，请稍后重试。</p>
+      <h1>{english ? "This page could not load" : "页面暂时无法加载"}</h1>
+      <p>{english ? "Something went wrong while reading data. Please try again." : "数据读取出现异常，请稍后重试。"}</p>
       <div className="status-page__actions">
-        <button className="primary-button" type="button" onClick={reset}>重新加载</button>
-        <Link className="secondary-button" href="/">返回首页</Link>
+        <button className="primary-button" type="button" onClick={reset}>{english ? "Reload" : "重新加载"}</button>
+        <Link className="secondary-button" href="/">{english ? "Back home" : "返回首页"}</Link>
       </div>
     </main>
   );

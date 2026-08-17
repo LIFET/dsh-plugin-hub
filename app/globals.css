@@ -60,8 +60,10 @@ body {
   --brand-strong: #252fc9;
   --line: #dce0e8;
   --surface: #ffffff;
+  --surface-2: #f0f2f6;
   --text: #11141a;
   --muted: #626a78;
+  --muted-2: #8a91a0;
   display: flex;
   width: min(680px, calc(100% - 40px));
   min-height: 100vh;
@@ -92,6 +94,11 @@ html[data-theme="dark"] .status-page {
   margin: 22px 0 0;
   color: var(--muted);
   line-height: 1.7;
+}
+
+.status-page .hero-search {
+  width: 100%;
+  margin-top: 24px;
 }
 
 .status-page__actions {
@@ -1651,6 +1658,54 @@ html:not([data-theme="dark"]) .hub[data-theme="light"] .code-panel {
 
 .quick-filters button.is-active,
 .quick-filters button:hover {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+  color: var(--brand-strong);
+}
+
+.filter-summary {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 0 0 16px;
+}
+
+.filter-summary button {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.search-hit {
+  padding: 0 2px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--amber) 28%, transparent);
+  color: inherit;
+}
+
+.profile-switch {
+  display: flex;
+  gap: 6px;
+  margin: 12px 0 0;
+}
+
+.profile-switch button {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.profile-switch button.is-active {
   border-color: var(--brand);
   background: var(--brand-soft);
   color: var(--brand-strong);

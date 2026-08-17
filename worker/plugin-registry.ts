@@ -287,12 +287,20 @@ export async function preflightPluginRepository(value: string, env: PluginRegist
     }
   }
   const topic = Array.isArray(meta.topics) && meta.topics.includes("dsh-plugin");
+  let listedId: string | null = null;
+  try {
+    const stored = await readPluginRegistryWithSource(env);
+    listedId = stored.registry.plugins.find((plugin) => plugin.id === repo.toLowerCase())?.id || null;
+  } catch {
+    listedId = null;
+  }
   return {
     repo,
     url: `https://github.com/${repo}`,
     topic,
     manifest: manifest.state,
     eligible: topic && manifest.state === "verified",
+    listedId,
   };
 }
 

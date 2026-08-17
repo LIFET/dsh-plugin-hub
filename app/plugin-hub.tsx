@@ -6,7 +6,7 @@ import type {
   PluginRecord,
   PluginRegistryData,
 } from "@/lib/plugin-data";
-import { comparePluginsByEvidence, displayDescription, suggestedInstallCommand, visiblePluginName } from "@/lib/plugin-screening.mjs";
+import { comparePluginsByEvidence, displayDescription, displayInstallCommand, suggestedInstallCommand, visiblePluginName } from "@/lib/plugin-screening.mjs";
 import Link from "next/link";
 import { type FormEvent, type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -135,6 +135,20 @@ function sourceClass(plugin: PluginRecord) {
   return plugin.topic ? "topic" : "list";
 }
 
+function highlightMatch(value: string, query: string) {
+  const needle = query.trim();
+  if (!needle) return value;
+  const index = value.toLowerCase().indexOf(needle.toLowerCase());
+  if (index < 0) return value;
+  return (
+    <>
+      {value.slice(0, index)}
+      <mark className="search-hit">{value.slice(index, index + needle.length)}</mark>
+      {value.slice(index + needle.length)}
+    </>
+  );
+}
+
 function PluginDetail({
   plugin,
   lang,
@@ -157,6 +171,8 @@ function PluginDetail({
   onShare: () => void;
 }) {
   const suggested = suggestedInstallCommand(plugin);
+  const [profile, setProfile] = useState<"web" | "default">("web");
+  const command = displayInstallCommand(plugin.installCommand || suggested, profile);
   return (
     <>
       <div className="plugin-drawer__badges">
@@ -176,24 +192,20 @@ function PluginDetail({
       <div className="drawer-section">
         <span className="drawer-label">{text(lang, "安装证据", "INSTALL EVIDENCE")}</span>
         {plugin.installCommand ? (
-          <>
-            <p>{text(lang, "命令已锁定到完成检查的 Git commit；执行前仍建议阅读完整源码。", "The command is pinned to the inspected Git commit. Review the complete source before running it.")}</p>
-            <div className="code-panel code-panel--drawer">
-              <code>{plugin.installCommand}</code>
-              <button type="button" onClick={() => onCopy(plugin.installCommand || "", plugin.id)}>{copied === plugin.id ? text(lang, "已复制", "Copied") : text(lang, "复制", "Copy")}</button>
-            </div>
-          </>
+          <p>{text(lang, "命令已锁定到完成检查的 Git commit；执行前仍建议阅读完整源码。", "The command is pinned to the inspected Git commit. Review the complete source before running it.")}</p>
         ) : (
-          <>
-            <p className="warning-copy">{plugin.screenedCommit
-              ? text(lang, "静态检查尚未通过，因此不提供正式安装命令。下面是钉到已检查提交的建议命令，执行前请先核对完整源码。", "Static screening has not passed, so no official install command is shown. The suggestion below is pinned to the inspected commit; review the complete source first.")
-              : text(lang, "当前证据不足或尚未完成源码检查，网站不提供正式安装命令。下面只是仓库级建议命令，执行前请先核对完整源码。", "Evidence is currently insufficient or the source scan is still pending, so no official install command is shown. The suggestion below is repository-level only; review the complete source first.")}</p>
-            <div className="code-panel code-panel--drawer">
-              <code>{suggested}</code>
-              <button type="button" onClick={() => onCopy(suggested, plugin.id)}>{copied === plugin.id ? text(lang, "已复制", "Copied") : text(lang, "复制", "Copy")}</button>
-            </div>
-          </>
+          <p className="warning-copy">{plugin.screenedCommit
+            ? text(lang, "静态检查尚未通过，因此不提供正式安装命令。下面是钉到已检查提交的建议命令，执行前请先核对完整源码。", "Static screening has not passed, so no official install command is shown. The suggestion below is pinned to the inspected commit; review the complete source first.")
+            : text(lang, "当前证据不足或尚未完成源码检查，网站不提供正式安装命令。下面只是仓库级建议命令，执行前请先核对完整源码。", "Evidence is currently insufficient or the source scan is still pending, so no official install command is shown. The suggestion below is repository-level only; review the complete source first.")}</p>
         )}
+        <div className="profile-switch" role="group" aria-label={text(lang, "安装 profile", "Install profile")}>
+          <button className={profile === "web" ? "is-active" : ""} type="button" onClick={() => setProfile("web")}>web</button>
+          <button className={profile === "default" ? "is-active" : ""} type="button" onClick={() => setProfile("default")}>{text(lang, "默认", "default")}</button>
+        </div>
+        <div className="code-panel code-panel--drawer">
+          <code>{command}</code>
+          <button type="button" onClick={() => onCopy(command, plugin.id)}>{copied === plugin.id ? text(lang, "已复制", "Copied") : text(lang, "复制", "Copy")}</button>
+        </div>
       </div>
 
       <div className="drawer-section">
@@ -250,6 +262,7 @@ function PluginCard({
   onOpen,
   onFavorite,
   view,
+  query,
 }: {
   plugin: PluginRecord;
   lang: Language;
@@ -257,6 +270,7 @@ function PluginCard({
   onOpen: () => void;
   onFavorite: () => void;
   view: "list" | "cards";
+  query: string;
 }) {
   return (
     <article className={`plugin-card plugin-card--${view}`}>
@@ -264,13 +278,13 @@ function PluginCard({
         <span className="plugin-card__number">№ {String(plugin.order + 1).padStart(3, "0")}</span>
         <span className="plugin-card__copy">
           <span className="plugin-card__title-row">
-            <strong>{visiblePluginName(plugin)}</strong>
+            <strong>{highlightMatch(visiblePluginName(plugin), query)}</strong>
             <span className={`evidence evidence--${sourceClass(plugin)}`}>
               {sourceLabel(plugin)}
             </span>
           </span>
           <span className="plugin-card__owner">{plugin.repo}</span>
-          <span className="plugin-card__description">{displayDescription(plugin, lang)}</span>
+          <span className="plugin-card__description">{highlightMatch(displayDescription(plugin, lang), query)}</span>
           <span className="plugin-card__meta">
             <span>★ {formatNumber(plugin.stars, lang)}</span>
             <span>{relativeDate(plugin.pushedAt, lang)}</span>
@@ -342,6 +356,7 @@ export function PluginHub({
     topic?: boolean;
     manifest?: string;
     eligible?: boolean;
+    listedId?: string | null;
   }>(null);
   const [visibleWindow, setVisibleWindow] = useState({ key: "", count: RESULT_BATCH_SIZE });
   const drawerRef = useRef<HTMLElement | null>(null);
@@ -485,10 +500,14 @@ export function PluginHub({
   }, [closeSelected, page, selected]);
 
   const toggleFavorite = useCallback((id: string) => {
-    setFavorites((current) =>
-      current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
-    );
-  }, []);
+    setFavorites((current) => {
+      const exists = current.includes(id);
+      const next = exists ? current.filter((item) => item !== id) : [...current, id];
+      setCopyMessage(exists ? text(lang, "已取消收藏", "Removed from saved") : text(lang, "已加入收藏", "Saved to favorites"));
+      window.setTimeout(() => setCopyMessage(""), 1800);
+      return next;
+    });
+  }, [lang]);
 
   const copy = useCallback(async (value: string, id: string) => {
     try {
@@ -513,7 +532,7 @@ export function PluginHub({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: repositoryUrl }),
       });
-      const result = await response.json() as { error?: string; repo?: string; topic?: boolean; manifest?: string; eligible?: boolean };
+      const result = await response.json() as { error?: string; repo?: string; topic?: boolean; manifest?: string; eligible?: boolean; listedId?: string | null };
       if (!response.ok) throw new Error(result.error || text(lang, "检查失败", "Check failed"));
       setPreflight(result);
     } catch (error) {
@@ -825,6 +844,13 @@ export function PluginHub({
             <div className="page-heading">
               <div><span className="section-kicker">CATALOG</span><h1>{text(lang, "插件目录", "Plugin catalog")}</h1><p>{text(lang, `${filtered.length} 个结果 · 数据生成于 ${generatedLabel}`, `${filtered.length} results · generated ${generatedLabel}`)}</p></div>
             </div>
+            {recent.length > 0 && (
+              <ul className="recent-list">
+                {recent.map((item) => (
+                  <li key={item.id}><Link href={`/plugin/${item.id.split("/").map(encodeURIComponent).join("/")}`} prefetch={false}><strong>{item.name}</strong><small>{item.repo}</small></Link></li>
+                ))}
+              </ul>
+            )}
             <div className="catalog-toolbar">
               <label className="search-field">
                 <span>/</span>
@@ -859,6 +885,14 @@ export function PluginHub({
               <button className={evidence === "review" ? "is-active" : ""} type="button" onClick={() => setEvidence("review")}>{text(lang, "待复核", "Needs review")}</button>
               <button className={evidence === "favorites" ? "is-active" : ""} type="button" onClick={() => setEvidence("favorites")}>{text(lang, "收藏", "Saved")}</button>
             </div>
+            {(query.trim() || category !== "all" || evidence !== "all") && (
+              <div className="filter-summary">
+                {query.trim() && <button type="button" onClick={() => setQuery("")}>{text(lang, `搜索：${query.trim()}`, `Search: ${query.trim()}`)} ×</button>}
+                {category !== "all" && <button type="button" onClick={() => setCategory("all")}>{data.categories[category][lang]} ×</button>}
+                {evidence !== "all" && <button type="button" onClick={() => setEvidence("all")}>{text(lang, evidence === "clear" ? "检查通过" : evidence === "review" ? "待复核" : evidence === "favorites" ? "收藏" : evidence, evidence)} ×</button>}
+                <button type="button" onClick={() => { setQuery(""); setCategory("all"); setEvidence("all"); }}>{text(lang, "清除全部", "Clear all")}</button>
+              </div>
+            )}
             <div className="category-chips">
               <button className={category === "all" ? "is-active" : ""} type="button" onClick={() => setCategory("all")} aria-pressed={category === "all"}>{text(lang, "全部", "All")} <small>{data.summary.listed}</small></button>
               {CATEGORY_ORDER.map((id) => (
@@ -876,6 +910,7 @@ export function PluginHub({
                     onOpen={() => openPlugin(plugin)}
                     onFavorite={() => toggleFavorite(plugin.id)}
                     view={view}
+                    query={query}
                   />
                 ))}
               </div>
@@ -916,8 +951,8 @@ export function PluginHub({
             <form className="repository-check" onSubmit={checkRepository}>
               <div><span className="section-kicker">QUICK CHECK</span><h2>{text(lang, "先检查仓库是否满足收录条件", "Check listing readiness")}</h2><p>{text(lang, "这里只读取公开仓库信息和 package.json，不执行任何代码。", "This reads public repository metadata and package.json only; no code is executed.")}</p></div>
               <label><span>{text(lang, "GitHub 仓库地址", "GitHub repository URL")}</span><div><input type="url" required maxLength={300} value={repositoryUrl} onChange={(event) => setRepositoryUrl(event.target.value)} aria-label={text(lang, "GitHub 仓库地址", "GitHub repository URL")} placeholder="https://github.com/owner/repository" /><button className="primary-button" type="submit" disabled={preflight?.loading}>{preflight?.loading ? text(lang, "检查中…", "Checking…") : text(lang, "立即检查", "Check now")}</button></div></label>
-              {preflight && !preflight.loading && <div className={`repository-result ${preflight.error ? "is-error" : preflight.eligible ? "is-clear" : "is-review"}`} role="status">
-                {preflight.error ? <p>{preflight.error}</p> : <><strong>{preflight.eligible ? text(lang, "已满足自动发现条件", "Ready for automatic discovery") : text(lang, "还需要补充信息", "More information is needed")}</strong><ul><li>{text(lang, "dsh-plugin Topic", "dsh-plugin topic")}：{preflight.topic ? "✓" : "×"}</li><li>DSH manifest：{preflight.manifest === "verified" ? "✓" : preflight.manifest}</li></ul></>}
+              {preflight && !preflight.loading && <div className={`repository-result ${preflight.error ? "is-error" : preflight.listedId || preflight.eligible ? "is-clear" : "is-review"}`} role="status">
+                {preflight.error ? <p>{preflight.error}</p> : <><strong>{preflight.listedId ? text(lang, "这个仓库已经在目录里", "This repository is already listed") : preflight.eligible ? text(lang, "已满足自动发现条件", "Ready for automatic discovery") : text(lang, "还需要补充信息", "More information is needed")}</strong><ul><li>{text(lang, "dsh-plugin Topic", "dsh-plugin topic")}：{preflight.topic ? "✓" : "×"}</li><li>DSH manifest：{preflight.manifest === "verified" ? "✓" : preflight.manifest}</li></ul>{preflight.listedId && <p><Link href={`/plugin/${preflight.listedId.split("/").map(encodeURIComponent).join("/")}`}>{text(lang, "查看插件详情", "Open plugin page")} →</Link></p>}</>}
               </div>}
             </form>
             <div className="callout"><div><span className="section-kicker">SUBMIT</span><h2>{text(lang, "公开链路", "Public paths")}</h2></div><div className="callout__links"><a href="https://github.com/topics/dsh-plugin" target="_blank" rel="noreferrer">GitHub topic ↗</a><a href={data.sources.curated.repository} target="_blank" rel="noreferrer">awesome-dsh-plugin ↗</a></div></div>

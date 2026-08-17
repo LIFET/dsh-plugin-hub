@@ -3,7 +3,8 @@ export function classifyInspectionFailure(value: unknown): "uninspectable" | "tr
 export function sanitizePublicScanError(value: unknown): string;
 export function comparePluginsByEvidence(a: unknown, b: unknown): number;
 export function resolveRegistryScanLimit(input?: { token?: string; requested?: string | number }): number;
-export function suggestedInstallCommand(plugin: { repo?: string; screenedCommit?: string | null }): string;
+export function suggestedInstallCommand(plugin: { repo?: string; screenedCommit?: string | null }, profile?: "web" | "default"): string;
+export function displayInstallCommand(command: string | null | undefined, profile?: "web" | "default"): string;
 export function visiblePluginName(plugin: { name?: string; repo?: string }): string;
 export function displayDescription(plugin: { description?: { zh?: string; en?: string } }, lang?: string): string;
 export function selectFeaturedPlugins<T>(plugins: T[], limit?: number): T[];

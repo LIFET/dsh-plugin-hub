@@ -15,6 +15,7 @@ import {
   selectFeaturedPlugins,
   selectRelatedPlugins,
   suggestedInstallCommand,
+  displayInstallCommand,
   visiblePluginName,
   displayDescription,
   inspectionQueuePriority,
@@ -104,6 +105,14 @@ test("suggests a commit-pinned command when a screened commit exists", () => {
   assert.equal(
     suggestedInstallCommand({ repo: "owner/plugin", screenedCommit: null }),
     "dsh plugin --profile web add github:owner/plugin",
+  );
+  assert.equal(
+    suggestedInstallCommand({ repo: "owner/plugin", screenedCommit: null }, "default"),
+    "dsh plugin add github:owner/plugin",
+  );
+  assert.equal(
+    displayInstallCommand("dsh plugin --profile web add github:owner/plugin#abc", "default"),
+    "dsh plugin add github:owner/plugin#abc",
   );
 });
 
