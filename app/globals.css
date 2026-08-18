@@ -1561,6 +1561,12 @@ html[data-theme="dark"] .hub,
     border-right: 0;
   }
 
+  .category-chips {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
   .site-header__inner { padding: 0 16px; }
 
   .main-nav {
@@ -1619,9 +1625,13 @@ html[data-theme="dark"] .hub,
   .shell { width: calc(100% - 32px); }
   .brand__name { display: none; }
 
-  .hero__content { padding: 22px 0 8px; }
-  .hero h1 { font-size: 22px; }
-  .hero__content > p { font-size: 13px; }
+  .hero__content { padding: 18px 0 4px; }
+  .hero h1 { font-size: 20px; }
+  .hero__content > p,
+  .hero-meta,
+  .catalog .page-heading p { display: none; }
+  .catalog .page-heading { margin-bottom: 8px; }
+  .catalog .page-heading h1 { font-size: 18px; }
   .hero-search { width: 100%; flex-direction: column; }
 
   .page-heading h1 { font-size: 24px; }
