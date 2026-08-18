@@ -1000,17 +1000,7 @@ export function PluginHub({
               </div>
             </section>
 
-            <section className="metrics" aria-label={text(lang, "数据概览", "Registry metrics")}>
-              <div className="shell metrics__grid">
-                <Link href="/plugins" prefetch={false}><strong>{data.summary.listed}</strong><span>{text(lang, "目录插件", "Listed plugins")}</span></Link>
-                <Link href="/plugins?evidence=auto" prefetch={false}><strong>{data.summary.autoDiscovered}</strong><span>{text(lang, "自动发现", "Auto-discovered")}</span></Link>
-                <div><strong>{formatNumber(data.summary.topicTotal, lang)}</strong><span>{text(lang, "GitHub 话题仓库", "Topic repositories")}</span></div>
-                <Link href="/plugins?evidence=clear" prefetch={false}><strong>{data.summary.screeningClear}</strong><span>{text(lang, "静态检查通过", "Static scan clear")}</span></Link>
-                <Link href="/plugins?evidence=review" prefetch={false}><strong>{data.summary.screeningReview + data.summary.screeningBlocked}</strong><span>{text(lang, "待复核或拦截", "Review or blocked")}</span></Link>
-              </div>
-            </section>
-
-            <section className="section shell">
+            <section className="section shell index-list">
               <div className="section-heading">
                 <div><h2>{text(lang, "已通过检查的热门插件", "Popular plugins that passed screening")}</h2></div>
                 <Link className="text-button" href="/rank" prefetch={false}>{text(lang, "完整排行榜", "Full leaderboard")} →</Link>

@@ -508,6 +508,10 @@ html:not([data-theme="dark"]) .hub[data-theme="light"] {
   padding-block: 48px;
 }
 
+.hero + .section {
+  padding-top: 20px;
+}
+
 .section + .section {
   border-top: 1px solid var(--line);
 }
