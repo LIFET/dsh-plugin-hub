@@ -996,12 +996,7 @@ export function PluginHub({
                   <Link className="secondary-button" href="/plugins" prefetch={false}>{text(lang, "浏览全部插件", "Browse all plugins")}</Link>
                   <a className="text-button" href={data.sources.curated.repository} target="_blank" rel="noreferrer">{text(lang, "查看数据源", "Open data source")} ↗</a>
                 </div>
-                <details className="scan-status">
-                  <summary><span className={`status-dot status-dot--${data.automation.state}`} />{automationLabel}</summary>
-                  <div><b>{inspectedCount}/{data.summary.listed}</b><span>{text(lang, "已完成源码级检查", "source-level checks complete")}</span></div>
-                  <p>{data.automation.error || text(lang, "当前没有巡检错误。", "No current scan error.")}</p>
-                  <small>{text(lang, `上次运行：${data.automation.lastRunAt?.slice(0, 16).replace("T", " ") || "尚未运行"} UTC`, `Last run: ${data.automation.lastRunAt?.slice(0, 16).replace("T", " ") || "not yet"} UTC`)}</small>
-                </details>
+                <p className="hero-meta">{channelLabel} · {inspectedCount}/{data.summary.listed} {text(lang, "已完成源码级检查", "source-level checks complete")} · {automationLabel}</p>
               </div>
             </section>
 
@@ -1093,16 +1088,7 @@ export function PluginHub({
             </section>
 
             <section className="section shell source-panel">
-              <div>
-                <h2>{text(lang, "每张卡片都说明证据到哪一步", "Every card shows how far the evidence goes")}</h2>
-                <p>{text(lang, "网站只读取公开元数据、manifest、README 与少量声明入口源码。扫描过程不安装依赖、不运行 lifecycle，也不执行插件代码；结果属于轻量静态检查。", "The hub reads public metadata, manifests, READMEs, and a small set of declared source entrypoints. It installs no dependencies, runs no lifecycle scripts, and executes no plugin code. Results are lightweight static checks.")}</p>
-              </div>
-              <div className="source-steps">
-                <div><b>01</b><strong>LIST</strong><span>{text(lang, "社区精选名单", "Community curation")}</span></div>
-                <div><b>02</b><strong>TOPIC</strong><span>{text(lang, "GitHub 实时元数据", "Live GitHub metadata")}</span></div>
-                <div><b>03</b><strong>MANIFEST</strong><span>{text(lang, "仓库清单静态检查", "Static package check")}</span></div>
-                <div><b>04</b><strong>SOURCE</strong><span>{text(lang, "入口源码风险信号", "Entrypoint risk signals")}</span></div>
-              </div>
+              <p>{text(lang, "网站只读取公开元数据、manifest、README 与少量声明入口源码。扫描过程不安装依赖、不运行 lifecycle，也不执行插件代码；结果属于轻量静态检查。", "The hub reads public metadata, manifests, READMEs, and a small set of declared source entrypoints. It installs no dependencies, runs no lifecycle scripts, and executes no plugin code. Results are lightweight static checks.")}</p>
             </section>
           </>
         )}

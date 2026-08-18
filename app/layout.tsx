@@ -18,8 +18,8 @@ const sharedMetadata: Metadata = {
 export const viewport: Viewport = {
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f6f7fa" },
-    { media: "(prefers-color-scheme: dark)", color: "#0d0f13" },
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
   ],
 };
 
@@ -63,7 +63,10 @@ export default async function RootLayout({
   return (
     <html lang={initialLanguage} data-theme={initialTheme} suppressHydrationWarning>
       <head><script dangerouslySetInnerHTML={{ __html: preferenceBootstrap }} /></head>
-      <body>{children}</body>
+      <body>
+        <div hidden dangerouslySetInnerHTML={{ __html: `<!-- THESIS: This is a working index of install evidence, not a marketing landing or card gallery. OWN-WORLD: One ink. Paper white or lamp-black ground; hairline rules; hierarchy by type size only; inverted chips for the one state that matters. STORY: Search, scan a name, read the check, copy a pinned command. FIRST VIEWPORT: Identity left, routes center, utilities right. Headline at reading size. Search is the primary control. A dense name list starts in the same viewport. FORM: Swiss catalog index raised by festival-lineup billing and console hairlines; seed 4ed10db1, brief-pinned black-white. FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance -->` }} />
+        {children}
+      </body>
     </html>
   );
 }

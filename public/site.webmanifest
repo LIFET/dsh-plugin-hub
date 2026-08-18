@@ -4,8 +4,8 @@
   "description": "DeepSeek Harness community plugin index",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f6f7fa",
-  "theme_color": "#3d46d8",
+  "background_color": "#ffffff",
+  "theme_color": "#111111",
   "lang": "zh-CN",
   "icons": [
     {

@@ -5,7 +5,7 @@ export default async function NotFound() {
   const english = (await cookies()).get("dsh-plugin-hub-lang")?.value === "en";
   return (
     <main className="status-page">
-      <span className="section-kicker">404</span>
+      <p>404</p>
       <h1>{english ? "No plugin here" : "这里没有插件"}</h1>
       <p>{english ? "The link may have expired, or this plugin has not been listed yet." : "链接可能已经失效，或者这个插件还没有被收录。"}</p>
       <form className="hero-search" action="/plugins" method="get">

@@ -11,7 +11,7 @@ export default function ErrorPage({ error, reset }: { error: Error & { digest?: 
 
   return (
     <main className="status-page">
-      <span className="section-kicker">ERROR</span>
+      <p>ERROR</p>
       <h1>{english ? "This page could not load" : "页面暂时无法加载"}</h1>
       <p>{english ? "Something went wrong while reading data. Please try again." : "数据读取出现异常，请稍后重试。"}</p>
       <div className="status-page__actions">
