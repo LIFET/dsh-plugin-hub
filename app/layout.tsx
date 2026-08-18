@@ -33,8 +33,8 @@ const sharedMetadata: Metadata = {
 export const viewport: Viewport = {
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#d8d8d2" },
-    { media: "(prefers-color-scheme: dark)", color: "#0e0e0e" },
+    { media: "(prefers-color-scheme: light)", color: "#0b1f33" },
+    { media: "(prefers-color-scheme: dark)", color: "#07131f" },
   ],
 };
 
@@ -79,7 +79,7 @@ export default async function RootLayout({
     <html lang={initialLanguage} data-theme={initialTheme} className={`${barlow.variable} ${notoSans.variable}`} suppressHydrationWarning>
       <head><script dangerouslySetInnerHTML={{ __html: preferenceBootstrap }} /></head>
       <body>
-        <div hidden dangerouslySetInnerHTML={{ __html: `<!-- THESIS: A plotted drawing of install evidence, not a newspaper masthead, marketplace, or costume theme. OWN-WORLD: Gray desk, white sheet, 1px ink border, one ochre mark, one grotesque. Title block is the chrome. STORY: Search, scan a name, read the assays, copy a pinned command. FIRST VIEWPORT: Type nav on the sheet. Headline at reading size. Search, then the name list in the same frame. Title block holds counts. FORM: Architect title-block sheet, seed 7185b738 assigned #3, raised by Rams air and civic emptiness; brief-pinned 简洁有设计感. FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance -->` }} />
+        <div hidden dangerouslySetInnerHTML={{ __html: `<!-- THESIS: A wayfinding board of install evidence, not a framed drawing, newspaper masthead, or card market. OWN-WORLD: Navy rail, sky field, signal yellow for the current route, one grotesque. No author plaque. STORY: Search, scan a name, read the check, copy a pinned command. FIRST VIEWPORT: Left destinations, right the list. Names are large. Search is the from-field. FORM: Airport wayfinding, seed 3414a729 assigned #6, raised by type-specimen scale and Kraftwerk one-signal color; brief 简洁有设计感, no footer author. FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance -->` }} />
         {children}
       </body>
     </html>

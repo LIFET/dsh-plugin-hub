@@ -989,8 +989,8 @@ export function PluginHub({
   return (
     <div className="hub" data-theme={theme} data-lang={lang}>
       <a className="skip-link" href="#main-content">{text(lang, "跳到主要内容", "Skip to content")}</a>
-      <div className="desk">
-      <div className="sheet">
+      <div className="app">
+      <aside className="rail">
       <header className="site-header">
         <div className="site-header__inner">
           <Link className="brand" href="/" prefetch={false}>
@@ -1030,7 +1030,8 @@ export function PluginHub({
           </div>
         </div>
       </header>
-
+      </aside>
+      <div className="stage">
       <main id="main-content">
         {page === "home" && (
           <>
@@ -1433,23 +1434,10 @@ export function PluginHub({
         )}
       </main>
 
-      <footer className="title-block">
-        <div>
-          <b>Project</b>
-          <span>DSH PLUGIN HUB · {data.summary.listed} LISTED · {data.summary.autoDiscovered} AUTO · 30 MIN</span>
-        </div>
-        <div>
-          <b>Drawn</b>
-          <span>{text(lang, "社区索引 · 作者：岚叔 · 与 DeepSeek AI 无隶属关系", "Community index · Author: 岚叔 · not affiliated with DeepSeek AI")}</span>
-        </div>
-        <div>
-          <b>Rev</b>
-          <span>{channelLabel} · {automationLabel}</span>
-        </div>
-        <div>
-          <b>Index</b>
-          <Link href="/api/plugins">JSON API</Link>
-        </div>
+      <footer className="site-footer">
+        <span>DSH PLUGIN HUB · {data.summary.listed} LISTED · {data.summary.autoDiscovered} AUTO · 30 MIN</span>
+        <span>{text(lang, "社区索引 · 与 DeepSeek AI 无隶属关系", "Community index · not affiliated with DeepSeek AI")}</span>
+        <Link href="/api/plugins">JSON API</Link>
       </footer>
       </div>
       </div>

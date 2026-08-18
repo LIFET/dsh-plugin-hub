@@ -99,7 +99,8 @@ test("server-renders the complete plugin hub", async () => {
   assert.match(html, new RegExp(String(registry.summary.manifestMatches)));
   assert.match(html, /30 MIN/);
   assert.match(html, /自动发现/);
-  assert.match(html, /作者：岚叔/);
+  assert.match(html, /与 DeepSeek AI 无隶属关系/);
+  assert.doesNotMatch(html, /作者：岚叔/);
   assert.match(html, /JSON API/);
   assert.match(html, /href="\/plugins"/);
   assert.match(html, /跳到主要内容|Skip to content/u);
