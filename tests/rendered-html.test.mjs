@@ -116,6 +116,7 @@ test("serves shareable pages and plugin detail metadata", async () => {
   for (const [path, expected] of [
     ["/plugins?q=tool", "搜索 tool"],
     ["/plugins?category=memory", "<title>记忆"],
+    ["/plugins", "可正式安装"],
     ["/rank", "排行榜"],
     ["/submit", "让你的插件被看见"],
     ["/guide", "从一个可检查的插件开始"],
@@ -136,6 +137,7 @@ test("serves shareable pages and plugin detail metadata", async () => {
   assert.doesNotMatch(html, /<h1[^>]*>插件目录/u);
   assert.match(html, /application\/ld\+json/u);
   assert.match(html, /SoftwareApplication/u);
+  assert.match(html, /完整检查记录|Full screening record/u);
   assert.match(html, new RegExp(`rel="canonical" href="https://apiu.cc/plugin/${plugin.id}`));
   assert.ok(Buffer.byteLength(html) < 220_000, `plugin payload is ${Buffer.byteLength(html)} bytes`);
 });

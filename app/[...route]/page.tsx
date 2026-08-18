@@ -99,7 +99,7 @@ export default async function RoutedHub({ params, searchParams }: Props) {
     ? requestedCategory
     : "all";
   const requestedEvidence = firstParam(filters.evidence);
-  const initialEvidence = ["all", "auto", "topic", "manifest", "clear", "review", "favorites"].includes(requestedEvidence)
+  const initialEvidence = ["all", "auto", "topic", "manifest", "clear", "installable", "review", "favorites"].includes(requestedEvidence)
     ? requestedEvidence
     : "all";
   const requestedSort = firstParam(filters.sort);
@@ -135,7 +135,7 @@ export default async function RoutedHub({ params, searchParams }: Props) {
       initialPage={details.page}
       initialQuery={initialQuery}
       initialCategory={initialCategory as "all" | CategoryId}
-      initialEvidence={initialEvidence as "all" | "auto" | "topic" | "manifest" | "clear" | "review" | "favorites"}
+      initialEvidence={initialEvidence as "all" | "auto" | "topic" | "manifest" | "clear" | "installable" | "review" | "favorites"}
       initialSort={initialSort as "evidence" | "curated" | "stars" | "updated" | "added" | "name"}
       initialOwner={initialOwner}
       initialRepositoryUrl={details.page === "submit" ? normalizeRepositoryUrl(firstParam(filters.url)) : ""}

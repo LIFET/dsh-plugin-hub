@@ -12,7 +12,8 @@ import { type FormEvent, type MouseEvent, useCallback, useEffect, useMemo, useRe
 
 type PageId = "home" | "catalog" | "rank" | "submit" | "guide" | "plugin";
 type SortId = "evidence" | "curated" | "stars" | "updated" | "added" | "name";
-type EvidenceFilter = "all" | "auto" | "topic" | "manifest" | "clear" | "review" | "favorites";
+type EvidenceFilter = "all" | "auto" | "topic" | "manifest" | "clear" | "installable" | "review" | "favorites";
+const EVIDENCE_FILTERS: EvidenceFilter[] = ["all", "auto", "topic", "manifest", "clear", "installable", "review", "favorites"];
 
 const PAGES: Array<{ id: Exclude<PageId, "plugin">; zh: string; en: string }> = [
   { id: "home", zh: "首页", en: "Home" },
@@ -265,20 +266,23 @@ function PluginDetail({
 
       <div className="drawer-section">
         <span className="drawer-label">{text(lang, "自动检查结果", "AUTOMATED SCREENING")}</span>
-        <dl className="evidence-list">
-          <div><dt>{text(lang, "检查结论", "Screening")}</dt><dd>{signalLabel(plugin, lang)} · {plugin.screening.risk.toUpperCase()}</dd></div>
-          <div><dt>{text(lang, "检查范围", "Coverage")}</dt><dd>{plugin.screening.scope === "source" ? text(lang, "manifest + 声明入口源码", "manifest + declared source") : text(lang, "仅 manifest，等待补扫", "manifest only; source pending")}</dd></div>
-          <div><dt>Manifest</dt><dd>{plugin.manifest.state === "verified" ? `${plugin.manifest.kinds.join(" · ")} · ${plugin.manifest.packageName || "package"}` : plugin.manifest.state}</dd></div>
-          <div><dt>{text(lang, "版本", "Version")}</dt><dd>{plugin.manifest.version || "—"}</dd></div>
-          <div><dt>{text(lang, "已检查提交", "Screened commit")}</dt><dd>{plugin.screenedCommit ? <button className="commit-copy" type="button" onClick={() => onCopy(plugin.screenedCommit || "", `${plugin.id}-commit`)}>{copied === `${plugin.id}-commit` ? text(lang, "已复制", "Copied") : plugin.screenedCommit.slice(0, 12)}</button> : "—"}</dd></div>
-          <div><dt>{text(lang, "运行依赖", "Runtime deps")}</dt><dd>{plugin.manifest.runtimeDependencies}</dd></div>
-          <div><dt>{text(lang, "生命周期脚本", "Lifecycle scripts")}</dt><dd>{plugin.manifest.lifecycleScripts.length ? plugin.manifest.lifecycleScripts.join(", ") : text(lang, "未发现", "None found")}</dd></div>
-          <div><dt>{text(lang, "维护状态", "Maintenance")}</dt><dd>{maintenanceLabel(plugin, lang)}</dd></div>
-          <div><dt>{text(lang, "默认分支", "Default branch")}</dt><dd>{plugin.defaultBranch || "—"}</dd></div>
-          <div><dt>{text(lang, "已读文件", "Files inspected")}</dt><dd>{plugin.screening.filesInspected.length ? plugin.screening.filesInspected.join(" · ") : "—"}</dd></div>
-          <div><dt>{text(lang, "检查时间", "Checked at")}</dt><dd>{plugin.screening.checkedAt.slice(0, 16).replace("T", " ")} UTC</dd></div>
-        </dl>
         {plugin.screening.findings.length > 0 && <ul className="reason-list">{plugin.screening.findings.map((finding) => <li className={`reason-list__item reason-list__item--${finding.severity}`} key={finding.id}>{finding.label[lang]}{finding.files.length ? ` · ${finding.files.join(", ")}` : ""}</li>)}</ul>}
+        <details className="evidence-details">
+          <summary>{text(lang, "完整检查记录", "Full screening record")}</summary>
+          <dl className="evidence-list">
+            <div><dt>{text(lang, "检查结论", "Screening")}</dt><dd>{signalLabel(plugin, lang)} · {plugin.screening.risk.toUpperCase()}</dd></div>
+            <div><dt>{text(lang, "检查范围", "Coverage")}</dt><dd>{plugin.screening.scope === "source" ? text(lang, "manifest + 声明入口源码", "manifest + declared source") : text(lang, "仅 manifest，等待补扫", "manifest only; source pending")}</dd></div>
+            <div><dt>Manifest</dt><dd>{plugin.manifest.state === "verified" ? `${plugin.manifest.kinds.join(" · ")} · ${plugin.manifest.packageName || "package"}` : plugin.manifest.state}</dd></div>
+            <div><dt>{text(lang, "版本", "Version")}</dt><dd>{plugin.manifest.version || "—"}</dd></div>
+            <div><dt>{text(lang, "已检查提交", "Screened commit")}</dt><dd>{plugin.screenedCommit ? <button className="commit-copy" type="button" onClick={() => onCopy(plugin.screenedCommit || "", `${plugin.id}-commit`)}>{copied === `${plugin.id}-commit` ? text(lang, "已复制", "Copied") : plugin.screenedCommit.slice(0, 12)}</button> : "—"}</dd></div>
+            <div><dt>{text(lang, "运行依赖", "Runtime deps")}</dt><dd>{plugin.manifest.runtimeDependencies}</dd></div>
+            <div><dt>{text(lang, "生命周期脚本", "Lifecycle scripts")}</dt><dd>{plugin.manifest.lifecycleScripts.length ? plugin.manifest.lifecycleScripts.join(", ") : text(lang, "未发现", "None found")}</dd></div>
+            <div><dt>{text(lang, "维护状态", "Maintenance")}</dt><dd>{maintenanceLabel(plugin, lang)}</dd></div>
+            <div><dt>{text(lang, "默认分支", "Default branch")}</dt><dd>{plugin.defaultBranch || "—"}</dd></div>
+            <div><dt>{text(lang, "已读文件", "Files inspected")}</dt><dd>{plugin.screening.filesInspected.length ? plugin.screening.filesInspected.join(" · ") : "—"}</dd></div>
+            <div><dt>{text(lang, "检查时间", "Checked at")}</dt><dd>{plugin.screening.checkedAt.slice(0, 16).replace("T", " ")} UTC</dd></div>
+          </dl>
+        </details>
       </div>
 
       <div className="drawer-actions">
@@ -455,7 +459,7 @@ export function PluginHub({
   const loadMoreRef = useRef<HTMLButtonElement | null>(null);
   const [view, setView] = useState<"list" | "cards">("list");
   const [evidence, setEvidence] = useState<EvidenceFilter>(
-    ["all", "auto", "topic", "manifest", "clear", "review", "favorites"].includes(initialEvidence) ? initialEvidence : "all",
+    EVIDENCE_FILTERS.includes(initialEvidence) ? initialEvidence : "all",
   );
   const [favorites, setFavorites] = useState<string[]>([]);
   const [selected, setSelected] = useState<PluginRecord | null>(() => (
@@ -501,7 +505,7 @@ export function PluginHub({
       setOwner(normalizeOwnerParam(params.get("owner") || ""));
       if (initialCategory === "all" || CATEGORY_ORDER.includes(initialCategory as CategoryId)) setCategory(initialCategory as "all" | CategoryId);
       if (["evidence", "curated", "stars", "updated", "added", "name"].includes(initialSort || "")) setSort(initialSort as SortId);
-      if (["all", "auto", "topic", "manifest", "clear", "review", "favorites"].includes(initialEvidence || "")) setEvidence(initialEvidence as EvidenceFilter);
+      if (EVIDENCE_FILTERS.includes((initialEvidence || "") as EvidenceFilter)) setEvidence(initialEvidence as EvidenceFilter);
       try {
         const saved = JSON.parse(localStorage.getItem(PREFS_KEY) || "{}");
         if (saved.lang === "zh" || saved.lang === "en") setLang(saved.lang);
@@ -677,6 +681,7 @@ export function PluginHub({
       if (evidence === "topic" && !plugin.topic) return false;
       if (evidence === "manifest" && plugin.manifest.state !== "verified") return false;
       if (evidence === "clear" && plugin.screening.state !== "clear") return false;
+      if (evidence === "installable" && !plugin.installCommand) return false;
       if (evidence === "review" && !["review", "pending", "blocked"].includes(plugin.screening.state)) return false;
       if (evidence === "favorites" && !favoriteSet.has(plugin.id)) return false;
       if (owner && plugin.owner.toLowerCase() !== owner.toLowerCase()) return false;
@@ -961,10 +966,7 @@ export function PluginHub({
         {page === "home" && (
           <>
             <section className="hero">
-              <div className="hero__grid" aria-hidden="true" />
-              <div className="hero__glow" aria-hidden="true" />
               <div className="shell hero__content">
-                <div className="eyebrow"><span className="live-dot" /> DeepSeek Harness <i>/</i> {channelLabel} <i>/</i> 30 MIN</div>
                 <h1><span>{text(lang, "一切皆插件。", "Everything is a plugin.")}</span><span>{text(lang, "先看证据，再决定装不装。", "Check the evidence before you install.")}</span></h1>
                 <p>
                   {text(
@@ -1015,7 +1017,7 @@ export function PluginHub({
 
             <section className="section shell">
               <div className="section-heading">
-                <div><span className="section-kicker">VERIFIED POPULAR</span><h2>{text(lang, "已通过检查的热门插件", "Popular plugins that passed screening")}</h2></div>
+                <div><h2>{text(lang, "已通过检查的热门插件", "Popular plugins that passed screening")}</h2></div>
                 <Link className="text-button" href="/rank" prefetch={false}>{text(lang, "完整排行榜", "Full leaderboard")} →</Link>
               </div>
               <div className="featured-grid">
@@ -1045,7 +1047,7 @@ export function PluginHub({
             {newcomers.length > 0 && (
               <section className="section shell">
                 <div className="section-heading">
-                  <div><span className="section-kicker">JUST IN</span><h2>{text(lang, "最近收录", "Newly listed")}</h2></div>
+                  <div><h2>{text(lang, "最近收录", "Newly listed")}</h2></div>
                   <Link className="text-button" href="/plugins?sort=added" prefetch={false}>{text(lang, "按收录时间看", "Browse by added")} →</Link>
                 </div>
                 <ul className="recent-list">
@@ -1063,7 +1065,7 @@ export function PluginHub({
 
             {recent.length > 0 && (
               <section className="section shell recent-section">
-                <div className="section-heading"><div><span className="section-kicker">CONTINUE</span><h2>{text(lang, "最近看过", "Recently viewed")}</h2></div></div>
+                <div className="section-heading"><div><h2>{text(lang, "最近看过", "Recently viewed")}</h2></div></div>
                 <ul className="recent-list">
                   {recent.map((item) => (
                     <li key={item.id}><Link href={`/plugin/${item.id.split("/").map(encodeURIComponent).join("/")}`} prefetch={false}><strong>{item.name}</strong><small>{item.repo}</small></Link></li>
@@ -1073,7 +1075,7 @@ export function PluginHub({
             )}
 
             <section className="section shell">
-              <div className="section-heading"><div><span className="section-kicker">BROWSE</span><h2>{text(lang, "按分类逛", "Browse by category")}</h2></div></div>
+              <div className="section-heading"><div><h2>{text(lang, "按分类逛", "Browse by category")}</h2></div></div>
               <div className="category-grid">
                 {CATEGORY_ORDER.map((id) => (
                   <Link
@@ -1092,7 +1094,6 @@ export function PluginHub({
 
             <section className="section shell source-panel">
               <div>
-                <span className="section-kicker">EVIDENCE, NOT ENDORSEMENT</span>
                 <h2>{text(lang, "每张卡片都说明证据到哪一步", "Every card shows how far the evidence goes")}</h2>
                 <p>{text(lang, "网站只读取公开元数据、manifest、README 与少量声明入口源码。扫描过程不安装依赖、不运行 lifecycle，也不执行插件代码；结果属于轻量静态检查。", "The hub reads public metadata, manifests, READMEs, and a small set of declared source entrypoints. It installs no dependencies, runs no lifecycle scripts, and executes no plugin code. Results are lightweight static checks.")}</p>
               </div>
@@ -1110,7 +1111,6 @@ export function PluginHub({
           <section className="catalog shell page-section">
             <div className="page-heading">
               <div>
-                <span className="section-kicker">CATALOG</span>
                 <h1>{catalogPageTitle({
                   query,
                   category,
@@ -1190,6 +1190,7 @@ export function PluginHub({
                 <option value="topic">{text(lang, "已匹配 GitHub 话题", "Matched GitHub topic")}</option>
                 <option value="manifest">{text(lang, "已识别 manifest", "Manifest found")}</option>
                 <option value="clear">{text(lang, "静态检查通过", "Static scan clear")}</option>
+                <option value="installable">{text(lang, "可正式安装", "Official install")}</option>
                 <option value="review">{text(lang, "待复核或已拦截", "Review or blocked")}</option>
                 <option value="favorites">{text(lang, "只看收藏", "Favorites only")}</option>
               </select>
@@ -1206,18 +1207,12 @@ export function PluginHub({
                 <button className={view === "cards" ? "is-active" : ""} type="button" onClick={() => setView("cards")} aria-label={text(lang, "卡片视图", "Card view")} aria-pressed={view === "cards"}>▦</button>
               </div>
             </div>
-            <div className="quick-filters" role="group" aria-label={text(lang, "快捷筛选", "Quick filters")}>
-              <button className={evidence === "all" ? "is-active" : ""} type="button" onClick={() => setEvidence("all")}>{text(lang, "全部", "All")}</button>
-              <button className={evidence === "clear" ? "is-active" : ""} type="button" onClick={() => setEvidence("clear")}>{text(lang, "检查通过", "Screened clear")}</button>
-              <button className={evidence === "review" ? "is-active" : ""} type="button" onClick={() => setEvidence("review")}>{text(lang, "待复核", "Needs review")}</button>
-              <button className={evidence === "favorites" ? "is-active" : ""} type="button" onClick={() => setEvidence("favorites")}>{text(lang, "收藏", "Saved")}</button>
-            </div>
             {(query.trim() || owner || category !== "all" || evidence !== "all") && (
               <div className="filter-summary">
                 {query.trim() && <button type="button" onClick={() => setQuery("")}>{text(lang, `搜索：${query.trim()}`, `Search: ${query.trim()}`)} ×</button>}
                 {owner && <button type="button" onClick={() => setOwner("")}>{text(lang, `作者：${owner}`, `Owner: ${owner}`)} ×</button>}
                 {category !== "all" && <button type="button" onClick={() => setCategory("all")}>{data.categories[category][lang]} ×</button>}
-                {evidence !== "all" && <button type="button" onClick={() => setEvidence("all")}>{text(lang, evidence === "clear" ? "检查通过" : evidence === "review" ? "待复核" : evidence === "favorites" ? "收藏" : evidence, evidence)} ×</button>}
+                {evidence !== "all" && <button type="button" onClick={() => setEvidence("all")}>{text(lang, evidence === "clear" ? "检查通过" : evidence === "installable" ? "可正式安装" : evidence === "review" ? "待复核" : evidence === "favorites" ? "收藏" : evidence, evidence === "installable" ? "Official install" : evidence)} ×</button>}
                 <button type="button" onClick={() => { setQuery(""); setOwner(""); setCategory("all"); setEvidence("all"); }}>{text(lang, "清除全部", "Clear all")}</button>
               </div>
             )}
@@ -1265,7 +1260,7 @@ export function PluginHub({
         {page === "rank" && (
           <section className="shell page-section">
             <div className="page-heading">
-              <div><span className="section-kicker">PUBLIC SIGNALS</span><h1>{text(lang, "排行榜", "Leaderboard")}</h1><p>{text(lang, "星标与推送时间来自 GitHub。它们代表关注度和活跃度，不代表安全或质量。", "Stars and push times come from GitHub. They signal attention and activity, not safety or quality.")}</p></div>
+              <div><h1>{text(lang, "排行榜", "Leaderboard")}</h1><p>{text(lang, "星标与推送时间来自 GitHub。它们代表关注度和活跃度，不代表安全或质量。", "Stars and push times come from GitHub. They signal attention and activity, not safety or quality.")}</p></div>
             </div>
             <div className="rank-grid">
               <div className="rank-panel">
@@ -1302,7 +1297,7 @@ export function PluginHub({
 
         {page === "submit" && (
           <section className="shell page-section prose-page">
-            <div className="page-heading"><div><span className="section-kicker">OPEN REGISTRY</span><h1>{text(lang, "让你的插件被看见", "Get your plugin listed")}</h1><p>{text(lang, "收录走公开仓库链路，站点不接收代码上传。", "Listing follows public repository workflows; this site accepts no code uploads.")}</p></div></div>
+            <div className="page-heading"><div><h1>{text(lang, "让你的插件被看见", "Get your plugin listed")}</h1><p>{text(lang, "收录走公开仓库链路，站点不接收代码上传。", "Listing follows public repository workflows; this site accepts no code uploads.")}</p></div></div>
             <div className="process-grid">
               {[
                 ["01", "dsh-plugin", "给 GitHub 仓库添加 dsh-plugin topic。", "Add the dsh-plugin topic to your GitHub repository."],
@@ -1312,13 +1307,13 @@ export function PluginHub({
               ].map(([no, title, zh, en]) => <div className="process-card" key={no}><b>{no}</b><strong>{title}</strong><p>{text(lang, zh, en)}</p></div>)}
             </div>
             <form className="repository-check" onSubmit={checkRepository}>
-              <div><span className="section-kicker">QUICK CHECK</span><h2>{text(lang, "先检查仓库是否满足收录条件", "Check listing readiness")}</h2><p>{text(lang, "这里只读取公开仓库信息和 package.json，不执行任何代码。", "This reads public repository metadata and package.json only; no code is executed.")}</p></div>
+              <div><h2>{text(lang, "先检查仓库是否满足收录条件", "Check listing readiness")}</h2><p>{text(lang, "这里只读取公开仓库信息和 package.json，不执行任何代码。", "This reads public repository metadata and package.json only; no code is executed.")}</p></div>
               <label><span>{text(lang, "GitHub 仓库地址", "GitHub repository URL")}</span><div><input type="url" required maxLength={300} value={repositoryUrl} onChange={(event) => setRepositoryUrl(event.target.value)} aria-label={text(lang, "GitHub 仓库地址", "GitHub repository URL")} placeholder="https://github.com/owner/repository" /><button className="primary-button" type="submit" disabled={preflight?.loading}>{preflight?.loading ? text(lang, "检查中…", "Checking…") : text(lang, "立即检查", "Check now")}</button></div></label>
               {preflight && !preflight.loading && <div className={`repository-result ${preflight.error ? "is-error" : preflight.listedId || preflight.eligible ? "is-clear" : "is-review"}`} role="status">
                 {preflight.error ? <p>{preflight.error}</p> : <><strong>{preflight.listedId ? text(lang, "这个仓库已经在目录里", "This repository is already listed") : preflight.eligible ? text(lang, "已满足自动发现条件", "Ready for automatic discovery") : text(lang, "还需要补充信息", "More information is needed")}</strong><ul><li>{text(lang, "dsh-plugin Topic", "dsh-plugin topic")}：{preflight.topic ? "✓" : "×"}</li><li>DSH manifest：{preflight.manifest === "verified" ? "✓" : preflight.manifest}</li></ul>{preflight.listedId ? <p><Link href={`/plugin/${preflight.listedId.split("/").map(encodeURIComponent).join("/")}`}>{text(lang, "查看插件详情", "Open plugin page")} →</Link></p> : !preflight.eligible ? <p><Link href="/guide">{text(lang, "查看开发指南", "Read the guide")} →</Link></p> : <p>{text(lang, "加上 topic 后，网站会在 30 分钟内自动发现。", "After the topic is added, the hub discovers it within 30 minutes.")}</p>}</>}
               </div>}
             </form>
-            <div className="callout"><div><span className="section-kicker">SUBMIT</span><h2>{text(lang, "公开链路", "Public paths")}</h2></div><div className="callout__links"><a href="https://github.com/topics/dsh-plugin" target="_blank" rel="noreferrer">GitHub topic ↗</a><a href={data.sources.curated.repository} target="_blank" rel="noreferrer">awesome-dsh-plugin ↗</a></div></div>
+            <div className="callout"><div><h2>{text(lang, "公开链路", "Public paths")}</h2></div><div className="callout__links"><a href="https://github.com/topics/dsh-plugin" target="_blank" rel="noreferrer">GitHub topic ↗</a><a href={data.sources.curated.repository} target="_blank" rel="noreferrer">awesome-dsh-plugin ↗</a></div></div>
           </section>
         )}
 
@@ -1347,7 +1342,7 @@ export function PluginHub({
 
         {page === "guide" && (
           <section className="shell page-section prose-page">
-            <div className="page-heading"><div><span className="section-kicker">BUILD WITH EVIDENCE</span><h1>{text(lang, "从一个可检查的插件开始", "Start with an inspectable plugin")}</h1><p>{text(lang, "最短路径：模板、manifest、公开扩展点、静态体检、独立 profile 验证。", "The shortest path: template, manifest, public seams, static checks, isolated-profile verification.")}</p></div></div>
+            <div className="page-heading"><div><h1>{text(lang, "从一个可检查的插件开始", "Start with an inspectable plugin")}</h1><p>{text(lang, "最短路径：模板、manifest、公开扩展点、静态体检、独立 profile 验证。", "The shortest path: template, manifest, public seams, static checks, isolated-profile verification.")}</p></div></div>
             <div className="guide-grid">
               {[
                 ["01", "模板", "Template", "克隆最小骨架，先跑通加载与卸载。", "Clone a minimal skeleton and verify load/unload first."],
