@@ -1,6 +1,21 @@
 import type { Metadata, Viewport } from "next";
+import { Barlow, Noto_Sans_SC } from "next/font/google";
 import { cookies } from "next/headers";
 import "./globals.css";
+
+const barlow = Barlow({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-barlow",
+  display: "swap",
+});
+
+const notoSans = Noto_Sans_SC({
+  subsets: ["latin"],
+  weight: ["400", "500", "700"],
+  variable: "--font-noto",
+  display: "swap",
+});
 
 const preferenceBootstrap = `try{const p=JSON.parse(localStorage.getItem('dsh-plugin-hub-prefs-v2')||'{}');if(p.theme==='dark'||p.theme==='light'){document.documentElement.dataset.theme=p.theme;document.documentElement.style.colorScheme=p.theme}if(p.lang==='en')document.documentElement.lang='en'}catch{}`;
 
@@ -18,8 +33,8 @@ const sharedMetadata: Metadata = {
 export const viewport: Viewport = {
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#111111" },
-    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
+    { media: "(prefers-color-scheme: light)", color: "#d8d8d2" },
+    { media: "(prefers-color-scheme: dark)", color: "#0e0e0e" },
   ],
 };
 
@@ -61,10 +76,10 @@ export default async function RootLayout({
   const initialLanguage = cookieStore.get("dsh-plugin-hub-lang")?.value === "en" ? "en" : "zh-CN";
   const initialTheme = cookieStore.get("dsh-plugin-hub-theme")?.value === "dark" ? "dark" : "light";
   return (
-    <html lang={initialLanguage} data-theme={initialTheme} suppressHydrationWarning>
+    <html lang={initialLanguage} data-theme={initialTheme} className={`${barlow.variable} ${notoSans.variable}`} suppressHydrationWarning>
       <head><script dangerouslySetInnerHTML={{ __html: preferenceBootstrap }} /></head>
       <body>
-        <div hidden dangerouslySetInnerHTML={{ __html: `<!-- THESIS: This is a working index of install evidence, not a marketing landing or card gallery. OWN-WORLD: One ink. Paper white or lamp-black ground; hairline rules; hierarchy by type size only; inverted chips for the one state that matters. STORY: Search, scan a name, read the check, copy a pinned command. FIRST VIEWPORT: Identity left, routes center, utilities right. Headline at reading size. Search is the primary control. A dense name list starts in the same viewport. FORM: Swiss catalog index raised by festival-lineup billing and console hairlines; seed 4ed10db1, brief-pinned black-white. FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance -->` }} />
+        <div hidden dangerouslySetInnerHTML={{ __html: `<!-- THESIS: A plotted drawing of install evidence, not a newspaper masthead, marketplace, or costume theme. OWN-WORLD: Gray desk, white sheet, 1px ink border, one ochre mark, one grotesque. Title block is the chrome. STORY: Search, scan a name, read the assays, copy a pinned command. FIRST VIEWPORT: Type nav on the sheet. Headline at reading size. Search, then the name list in the same frame. Title block holds counts. FORM: Architect title-block sheet, seed 7185b738 assigned #3, raised by Rams air and civic emptiness; brief-pinned 简洁有设计感. FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance -->` }} />
         {children}
       </body>
     </html>

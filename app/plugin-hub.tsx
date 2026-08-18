@@ -367,6 +367,7 @@ function PluginCard({
   view,
   query,
   active,
+  expanded,
 }: {
   plugin: PluginRecord;
   lang: Language;
@@ -378,13 +379,14 @@ function PluginCard({
   view: "list" | "cards";
   query: string;
   active?: boolean;
+  expanded?: boolean;
 }) {
   const command = pluginInstallCommand(plugin);
   const copyId = `${plugin.id}-card`;
   return (
-    <article className={`plugin-card plugin-card--${view}${active ? " is-cursor" : ""}`}>
+    <article className={`plugin-card plugin-card--${view}${active ? " is-cursor" : ""}${expanded ? " is-open" : ""}`}>
       <Link className="plugin-card__main" href={pluginPath(plugin)} prefetch={false} onClick={(event) => openInDrawer(event, onOpen)}>
-        <span className="plugin-card__number">№ {String(plugin.order + 1).padStart(3, "0")}</span>
+        <span className="plugin-card__number">{String(plugin.order + 1).padStart(3, "0")}</span>
         <span className="plugin-card__copy">
           <span className="plugin-card__title-row">
             <strong>{highlightMatch(visiblePluginName(plugin), query)}</strong>
@@ -401,6 +403,20 @@ function PluginCard({
             <span>{plugin.license || text(lang, "无许可证", "No license")}</span>
             <span className={`signal signal--${plugin.attention.level}`}>{signalLabel(plugin, lang)}</span>
           </span>
+          {expanded && (
+            <>
+              <span className="plugin-card__assay">
+                {CHECK_ITEMS.map(([id, zh, en]) => (
+                  <span key={id} className={plugin.screening.checks[id] ? "is-on" : "is-off"}>
+                    {plugin.screening.checks[id] ? "▣" : "□"} {text(lang, zh, en)}
+                  </span>
+                ))}
+              </span>
+              <span className="plugin-card__install">
+                <code>{command}</code>
+              </span>
+            </>
+          )}
         </span>
       </Link>
       <div className="plugin-card__actions">
@@ -471,6 +487,7 @@ export function PluginHub({
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [suggestIndex, setSuggestIndex] = useState(-1);
   const [cursor, setCursor] = useState(-1);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [category, setCategory] = useState<"all" | CategoryId>(initialCategory);
   const [sort, setSort] = useState<SortId>(["evidence", "curated", "stars", "updated", "added", "name"].includes(initialSort) ? initialSort : "evidence");
   const [homeQuery, setHomeQuery] = useState("");
@@ -593,14 +610,12 @@ export function PluginHub({
 
   const openPlugin = useCallback((plugin: PluginRecord) => {
     rememberRecent(plugin);
-    if (preferDedicatedPluginPage()) {
-      window.location.assign(pluginPath(plugin));
+    if (page === "catalog" && !preferDedicatedPluginPage()) {
+      setExpandedId((current) => (current === plugin.id ? null : plugin.id));
       return;
     }
-    returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    window.history.pushState({ drawer: true }, "", pluginPath(plugin));
-    setSelected(plugin);
-  }, [rememberRecent]);
+    window.location.assign(pluginPath(plugin));
+  }, [page, rememberRecent]);
 
   const closeSelected = useCallback(() => {
     if (page === "plugin") {
@@ -877,6 +892,7 @@ export function PluginHub({
 
   useEffect(() => {
     setCursor(-1);
+    setExpandedId(null);
   }, [filterKey]);
 
   useEffect(() => {
@@ -973,7 +989,8 @@ export function PluginHub({
   return (
     <div className="hub" data-theme={theme} data-lang={lang}>
       <a className="skip-link" href="#main-content">{text(lang, "跳到主要内容", "Skip to content")}</a>
-      <div className="site-frame" inert={page !== "plugin" && selected ? true : undefined}>
+      <div className="desk">
+      <div className="sheet">
       <header className="site-header">
         <div className="site-header__inner">
           <Link className="brand" href="/" prefetch={false}>
@@ -1282,6 +1299,7 @@ export function PluginHub({
                     view={view}
                     query={query}
                     active={cursor >= 0 && visiblePlugins[cursor]?.id === plugin.id}
+                    expanded={expandedId === plugin.id}
                   />
                 ))}
               </div>
@@ -1415,36 +1433,26 @@ export function PluginHub({
         )}
       </main>
 
-      <footer className="site-footer">
-        <div className="shell"><span>DSH PLUGIN HUB · {data.summary.listed} LISTED · {data.summary.autoDiscovered} AUTO · 30 MIN</span><span>{text(lang, "社区索引 · 作者：岚叔 · 与 DeepSeek AI 无隶属关系", "Community index · Author: 岚叔 · not affiliated with DeepSeek AI")}</span><Link href="/api/plugins">JSON API</Link></div>
+      <footer className="title-block">
+        <div>
+          <b>Project</b>
+          <span>DSH PLUGIN HUB · {data.summary.listed} LISTED · {data.summary.autoDiscovered} AUTO · 30 MIN</span>
+        </div>
+        <div>
+          <b>Drawn</b>
+          <span>{text(lang, "社区索引 · 作者：岚叔 · 与 DeepSeek AI 无隶属关系", "Community index · Author: 岚叔 · not affiliated with DeepSeek AI")}</span>
+        </div>
+        <div>
+          <b>Rev</b>
+          <span>{channelLabel} · {automationLabel}</span>
+        </div>
+        <div>
+          <b>Index</b>
+          <Link href="/api/plugins">JSON API</Link>
+        </div>
       </footer>
       </div>
-
-      {page !== "plugin" && selected && (
-        <div className="drawer-layer" role="presentation">
-          <button className="drawer-backdrop" type="button" onClick={closeSelected} aria-label={text(lang, "关闭详情", "Close details")} tabIndex={-1} />
-          <aside ref={drawerRef} className="plugin-drawer" role="dialog" aria-modal="true" aria-labelledby="plugin-title" aria-describedby="plugin-description">
-            <div className="plugin-drawer__top"><span>PLUGIN {String(selected.order + 1).padStart(3, "0")}</span><button ref={closeButtonRef} type="button" onClick={closeSelected} aria-label={text(lang, "关闭", "Close")}>×</button></div>
-            <div className="plugin-drawer__body">
-              <PluginDetail
-                plugin={selected}
-                lang={lang}
-                categoryLabel={data.categories[selected.category][lang]}
-                favorite={favorites.includes(selected.id)}
-                copied={copied}
-                related={relatedPlugins}
-                previous={previousPlugin}
-                next={nextPlugin}
-                catalogHref={catalogHref}
-                onCopy={copy}
-                onFavorite={() => toggleFavorite(selected.id)}
-                onShare={shareSelected}
-                onOpenRelated={openPlugin}
-              />
-            </div>
-          </aside>
-        </div>
-      )}
+      </div>
       {copyMessage && <div className="toast" role="status" aria-live="polite">{copyMessage}</div>}
     </div>
   );
