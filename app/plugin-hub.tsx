@@ -61,6 +61,23 @@ const PAGE_PATHS: Record<Exclude<PageId, "plugin">, string> = {
   guide: "/guide",
 };
 
+function catalogHrefFor(filters: {
+  query?: string;
+  owner?: string;
+  category?: "all" | CategoryId;
+  sort?: SortId;
+  evidence?: EvidenceFilter;
+}) {
+  const params = new URLSearchParams();
+  if (filters.query?.trim()) params.set("q", filters.query.trim());
+  if (filters.owner) params.set("owner", filters.owner);
+  if (filters.category && filters.category !== "all") params.set("category", filters.category);
+  if (filters.sort && filters.sort !== "evidence") params.set("sort", filters.sort);
+  if (filters.evidence && filters.evidence !== "all") params.set("evidence", filters.evidence);
+  const search = params.toString();
+  return `${PAGE_PATHS.catalog}${search ? `?${search}` : ""}`;
+}
+
 function text(lang: Language, zh: string, en: string) {
   return lang === "zh" ? zh : en;
 }
@@ -349,6 +366,7 @@ function PluginCard({
   onCopy,
   view,
   query,
+  active,
 }: {
   plugin: PluginRecord;
   lang: Language;
@@ -359,11 +377,12 @@ function PluginCard({
   onCopy: (value: string, id: string) => void;
   view: "list" | "cards";
   query: string;
+  active?: boolean;
 }) {
   const command = pluginInstallCommand(plugin);
   const copyId = `${plugin.id}-card`;
   return (
-    <article className={`plugin-card plugin-card--${view}`}>
+    <article className={`plugin-card plugin-card--${view}${active ? " is-cursor" : ""}`}>
       <Link className="plugin-card__main" href={pluginPath(plugin)} prefetch={false} onClick={(event) => openInDrawer(event, onOpen)}>
         <span className="plugin-card__number">№ {String(plugin.order + 1).padStart(3, "0")}</span>
         <span className="plugin-card__copy">
@@ -451,6 +470,7 @@ export function PluginHub({
   const [owner, setOwner] = useState(normalizeOwnerParam(initialOwner));
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [suggestIndex, setSuggestIndex] = useState(-1);
+  const [cursor, setCursor] = useState(-1);
   const [category, setCategory] = useState<"all" | CategoryId>(initialCategory);
   const [sort, setSort] = useState<SortId>(["evidence", "curated", "stars", "updated", "added", "name"].includes(initialSort) ? initialSort : "evidence");
   const [homeQuery, setHomeQuery] = useState("");
@@ -854,6 +874,38 @@ export function PluginHub({
   const visibleCount = visibleWindow.key === filterKey ? visibleWindow.count : RESULT_BATCH_SIZE;
   const visiblePlugins = filtered.slice(0, visibleCount);
   const hasMore = visiblePlugins.length < filtered.length;
+
+  useEffect(() => {
+    setCursor(-1);
+  }, [filterKey]);
+
+  useEffect(() => {
+    if (page !== "catalog" || selected) return;
+    const onKey = (event: KeyboardEvent) => {
+      const typing = event.target instanceof HTMLElement && ["INPUT", "TEXTAREA", "SELECT"].includes(event.target.tagName);
+      if (typing || suggestOpen || event.metaKey || event.ctrlKey || event.altKey) return;
+      if (event.key === "j" || event.key === "ArrowDown") {
+        event.preventDefault();
+        setCursor((current) => Math.min((current < 0 ? -1 : current) + 1, visiblePlugins.length - 1));
+      }
+      if (event.key === "k" || event.key === "ArrowUp") {
+        event.preventDefault();
+        setCursor((current) => Math.max(current < 0 ? 0 : current - 1, 0));
+      }
+      if (event.key === "Enter" && cursor >= 0 && visiblePlugins[cursor]) {
+        event.preventDefault();
+        openPlugin(visiblePlugins[cursor]);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [cursor, openPlugin, page, selected, suggestOpen, visiblePlugins]);
+
+  useEffect(() => {
+    if (cursor < 0) return;
+    const node = document.querySelectorAll<HTMLElement>(".plugin-card")[cursor];
+    node?.scrollIntoView({ block: "nearest" });
+  }, [cursor]);
   const inspectedCount = initialInspectedCount
     ?? data.plugins.filter((plugin) => plugin.screening.scope === "source").length;
 
@@ -1193,9 +1245,26 @@ export function PluginHub({
               </div>
             )}
             <div className="category-chips">
-              <button className={category === "all" ? "is-active" : ""} type="button" onClick={() => setCategory("all")} aria-pressed={category === "all"}>{text(lang, "全部", "All")} <small>{preCategory.length}</small></button>
+              <Link
+                className={category === "all" ? "is-active" : ""}
+                href={catalogHrefFor({ query, owner, category: "all", sort, evidence })}
+                prefetch={false}
+                onClick={(event) => { event.preventDefault(); setCategory("all"); }}
+                aria-current={category === "all" ? "page" : undefined}
+              >
+                {text(lang, "全部", "All")} <small>{preCategory.length}</small>
+              </Link>
               {CATEGORY_ORDER.map((id) => (
-                <button className={category === id ? "is-active" : ""} type="button" key={id} onClick={() => setCategory(id)} aria-pressed={category === id}>{data.categories[id][lang]} <small>{categoryCounts[id]}</small></button>
+                <Link
+                  className={category === id ? "is-active" : ""}
+                  href={catalogHrefFor({ query, owner, category: id, sort, evidence })}
+                  prefetch={false}
+                  key={id}
+                  onClick={(event) => { event.preventDefault(); setCategory(id); }}
+                  aria-current={category === id ? "page" : undefined}
+                >
+                  {data.categories[id][lang]} <small>{categoryCounts[id]}</small>
+                </Link>
               ))}
             </div>
             {filtered.length ? (
@@ -1212,6 +1281,7 @@ export function PluginHub({
                     onCopy={copy}
                     view={view}
                     query={query}
+                    active={cursor >= 0 && visiblePlugins[cursor]?.id === plugin.id}
                   />
                 ))}
               </div>
