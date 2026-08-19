@@ -264,7 +264,7 @@ function PluginDetail({
         <Link href={`/plugins?category=${plugin.category}`} prefetch={false}>{categoryLabel}</Link>
       </p>
       <div className="stat-chips">
-        <span>★ {formatNumber(plugin.stars, lang)}</span>
+        <span>{formatNumber(plugin.stars, lang)} {text(lang, "星", "stars")}</span>
         <span>{relativeDate(plugin.pushedAt, lang)}</span>
         <span>{plugin.license || text(lang, "许可证未声明", "License missing")}</span>
         <span>{plugin.language || text(lang, "语言未知", "Language unknown")}</span>
@@ -299,7 +299,7 @@ function PluginDetail({
           </div>
         </div>
         <div className="code-panel code-panel--drawer">
-          <code>{command}</code>
+          <code title={command}>{command}</code>
           <button type="button" onClick={() => onCopy(command, plugin.id)}>{copied === plugin.id ? text(lang, "已复制", "Copied") : text(lang, "复制", "Copy")}</button>
         </div>
       </div>
@@ -443,13 +443,15 @@ function PluginCard({
               : text(lang, "尚未通过静态检查，下面只是建议命令，安装前请核对源码。", "Static screening has not passed. This is a suggestion only; review the source first.")}
           </p>
           <div className="plugin-card__install">
-            <code>{command}</code>
+            <code title={command}>{command}</code>
             <button className="primary-button" type="button" onClick={() => onCopy(command, copyId)}>
               {copied === copyId
                 ? text(lang, "已复制", "Copied")
-                : official
-                  ? text(lang, "复制安装命令", "Copy install command")
-                  : text(lang, "复制建议命令", "Copy suggested command")}
+                : view === "cards"
+                  ? text(lang, "复制", "Copy")
+                  : official
+                    ? text(lang, "复制安装命令", "Copy install command")
+                    : text(lang, "复制建议命令", "Copy suggested command")}
             </button>
           </div>
           <Link className="text-button" href={pluginPath(plugin)} prefetch={false}>
@@ -1465,7 +1467,7 @@ export function PluginHub({
               const command = example ? pluginInstallCommand(example) : "npx @deepseek-ai/dsh plugin --profile web add github:owner/repository";
               return (
                 <>
-                  <div className="code-panel"><span>$</span><code>{command}</code><button type="button" onClick={() => copy(command, "guide")}>{copied === "guide" ? text(lang, "已复制", "Copied") : text(lang, "复制", "Copy")}</button></div>
+                  <div className="code-panel"><span>$</span><code title={command}>{command}</code><button type="button" onClick={() => copy(command, "guide")}>{copied === "guide" ? text(lang, "已复制", "Copied") : text(lang, "复制", "Copy")}</button></div>
                   <p className="fine-print">{example
                     ? text(lang, `这是已通过检查的 ${visiblePluginName(example)} 安装命令，可直接对照格式。发布前请确认包内已有可加载产物。`, `This is the inspected install command for ${visiblePluginName(example)}. Confirm the package contains loadable artifacts before publishing.`)
                     : text(lang, "命令只是格式示例。发布前请确认包内已有可加载产物，Git 安装所需的 prepare 脚本也应明确披露。", "The command is a format example. Before publishing, confirm the package contains loadable artifacts and disclose any prepare script needed by Git installs.")}</p>
