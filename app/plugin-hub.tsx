@@ -163,6 +163,29 @@ function pluginInstallCommand(plugin: PluginRecord) {
   return withPackageRunner(displayInstallCommand(plugin.installCommand || suggestedInstallCommand(plugin), "web"), "dsh");
 }
 
+function IconCopy() {
+  return (
+    <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+      <rect x="5.25" y="5.25" width="7.5" height="8" rx="1.4" fill="none" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M10.5 5.25V3.75A1.25 1.25 0 0 0 9.25 2.5H3.75A1.25 1.25 0 0 0 2.5 3.75v7.5A1.25 1.25 0 0 0 3.75 12.5H5.2" fill="none" stroke="currentColor" strokeWidth="1.4" />
+    </svg>
+  );
+}
+
+function IconStar({ filled = false }: { filled?: boolean }) {
+  return (
+    <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+      <path
+        d="M8 2.4 9.45 5.52l3.4.4-2.52 2.3.7 3.34L8 9.88l-3.03 1.68.7-3.34-2.52-2.3 3.4-.4z"
+        fill={filled ? "currentColor" : "none"}
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 const CHECK_ITEMS = [
   ["manifest", "Manifest", "Manifest"],
   ["license", "许可证", "License"],
@@ -383,10 +406,10 @@ function PluginCard({
 }) {
   const command = pluginInstallCommand(plugin);
   const copyId = `${plugin.id}-card`;
+  const official = Boolean(plugin.installCommand);
   return (
     <article className={`plugin-card plugin-card--${view}${active ? " is-cursor" : ""}${expanded ? " is-open" : ""}`}>
       <Link className="plugin-card__main" href={pluginPath(plugin)} prefetch={false} onClick={(event) => openInDrawer(event, onOpen)}>
-        <span className="plugin-card__number">{String(plugin.order + 1).padStart(3, "0")}</span>
         <span className="plugin-card__copy">
           <span className="plugin-card__title-row">
             <strong>{highlightMatch(visiblePluginName(plugin), query)}</strong>
@@ -397,37 +420,52 @@ function PluginCard({
           <span className="plugin-card__owner">{plugin.repo}</span>
           <span className="plugin-card__description">{highlightMatch(displayDescription(plugin, lang), query)}</span>
           <span className="plugin-card__meta">
-            <span>★ {formatNumber(plugin.stars, lang)}</span>
+            <span>{formatNumber(plugin.stars, lang)} {text(lang, "星", "stars")}</span>
             <span>{relativeDate(plugin.pushedAt, lang)}</span>
             {plugin.manifest.version && <span>v{plugin.manifest.version}</span>}
             <span>{plugin.license || text(lang, "无许可证", "No license")}</span>
             <span className={`signal signal--${plugin.attention.level}`}>{signalLabel(plugin, lang)}</span>
           </span>
-          {expanded && (
-            <>
-              <span className="plugin-card__assay">
-                {CHECK_ITEMS.map(([id, zh, en]) => (
-                  <span key={id} className={plugin.screening.checks[id] ? "is-on" : "is-off"}>
-                    {plugin.screening.checks[id] ? "▣" : "□"} {text(lang, zh, en)}
-                  </span>
-                ))}
-              </span>
-              <span className="plugin-card__install">
-                <code>{command}</code>
-              </span>
-            </>
-          )}
         </span>
       </Link>
+      {expanded && (
+        <div className="plugin-card__detail">
+          <div className="plugin-card__assay">
+            {CHECK_ITEMS.map(([id, zh, en]) => (
+              <span key={id} className={plugin.screening.checks[id] ? "is-on" : "is-off"}>
+                {text(lang, zh, en)}
+              </span>
+            ))}
+          </div>
+          <p className={`plugin-card__install-note${official ? "" : " is-warning"}`}>
+            {official
+              ? text(lang, "命令已钉到完成检查的提交。", "The command is pinned to the inspected commit.")
+              : text(lang, "尚未通过静态检查，下面只是建议命令，安装前请核对源码。", "Static screening has not passed. This is a suggestion only; review the source first.")}
+          </p>
+          <div className="plugin-card__install">
+            <code>{command}</code>
+            <button className="primary-button" type="button" onClick={() => onCopy(command, copyId)}>
+              {copied === copyId
+                ? text(lang, "已复制", "Copied")
+                : official
+                  ? text(lang, "复制安装命令", "Copy install command")
+                  : text(lang, "复制建议命令", "Copy suggested command")}
+            </button>
+          </div>
+          <Link className="text-button" href={pluginPath(plugin)} prefetch={false}>
+            {text(lang, "查看完整检查记录", "Open full screening record")} →
+          </Link>
+        </div>
+      )}
       <div className="plugin-card__actions">
         <button
           className="copy-install"
           type="button"
           onClick={() => onCopy(command, copyId)}
-          aria-label={plugin.installCommand ? text(lang, "复制安装命令", "Copy install command") : text(lang, "复制建议安装命令", "Copy suggested install command")}
-          title={plugin.installCommand ? text(lang, "复制安装命令", "Copy install command") : text(lang, "复制建议命令，安装前请核对源码", "Copy suggested command; review source first")}
+          aria-label={official ? text(lang, "复制安装命令", "Copy install command") : text(lang, "复制建议安装命令", "Copy suggested install command")}
+          title={official ? text(lang, "复制安装命令", "Copy install command") : text(lang, "复制建议命令，安装前请核对源码", "Copy suggested command; review source first")}
         >
-          {copied === copyId ? "✓" : "⎘"}
+          {copied === copyId ? text(lang, "已复制", "Copied") : <><IconCopy /><span>{text(lang, "复制", "Copy")}</span></>}
         </button>
         <button
           className={`favorite-button ${favorite ? "is-active" : ""}`}
@@ -436,7 +474,7 @@ function PluginCard({
           aria-label={text(lang, favorite ? "取消收藏" : "收藏", favorite ? "Remove favorite" : "Save favorite")}
           title={text(lang, favorite ? "取消收藏" : "收藏", favorite ? "Remove favorite" : "Save favorite")}
         >
-          ★
+          <IconStar filled={favorite} />
         </button>
       </div>
     </article>
@@ -610,7 +648,7 @@ export function PluginHub({
 
   const openPlugin = useCallback((plugin: PluginRecord) => {
     rememberRecent(plugin);
-    if (page === "catalog" && !preferDedicatedPluginPage()) {
+    if ((page === "catalog" || page === "home") && !preferDedicatedPluginPage()) {
       setExpandedId((current) => (current === plugin.id ? null : plugin.id));
       return;
     }
@@ -818,14 +856,22 @@ export function PluginHub({
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && page === "catalog" && (suggestOpen || query.trim())) {
-        event.preventDefault();
+      if (event.key === "Escape") {
         if (suggestOpen) {
+          event.preventDefault();
           setSuggestOpen(false);
           setSuggestIndex(-1);
           return;
         }
-        setQuery("");
+        if (expandedId) {
+          event.preventDefault();
+          setExpandedId(null);
+          return;
+        }
+        if (page === "catalog" && query.trim()) {
+          event.preventDefault();
+          setQuery("");
+        }
         return;
       }
       if (page === "catalog" && suggestOpen && suggestions.length) {
@@ -854,7 +900,7 @@ export function PluginHub({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [applySuggestion, page, query, suggestIndex, suggestOpen, suggestions]);
+  }, [applySuggestion, expandedId, page, query, suggestIndex, suggestOpen, suggestions]);
 
   const relatedPlugins = useMemo(() => {
     if (!selected) return [];
@@ -912,16 +958,27 @@ export function PluginHub({
         event.preventDefault();
         openPlugin(visiblePlugins[cursor]);
       }
+      if ((event.key === "c" || event.key === "C") && !event.shiftKey) {
+        const plugin = (expandedId && visiblePlugins.find((item) => item.id === expandedId)) || (cursor >= 0 ? visiblePlugins[cursor] : null);
+        if (!plugin) return;
+        event.preventDefault();
+        copy(pluginInstallCommand(plugin), `${plugin.id}-card`);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [cursor, openPlugin, page, selected, suggestOpen, visiblePlugins]);
+  }, [copy, cursor, expandedId, openPlugin, page, selected, suggestOpen, visiblePlugins]);
 
   useEffect(() => {
     if (cursor < 0) return;
     const node = document.querySelectorAll<HTMLElement>(".plugin-card")[cursor];
     node?.scrollIntoView({ block: "nearest" });
   }, [cursor]);
+
+  useEffect(() => {
+    if (!expandedId) return;
+    document.querySelector<HTMLElement>(".plugin-card.is-open")?.scrollIntoView({ block: "nearest" });
+  }, [expandedId]);
   const inspectedCount = initialInspectedCount
     ?? data.plugins.filter((plugin) => plugin.screening.scope === "source").length;
 
@@ -1017,7 +1074,7 @@ export function PluginHub({
               title={text(lang, "查看收藏", "View favorites")}
               aria-label={text(lang, `查看收藏，${favorites.length} 项`, `View ${favorites.length} saved plugins`)}
             >
-              ★ <span>{favorites.length}</span>
+              <IconStar filled={favorites.length > 0} /> <span>{favorites.length}</span>
             </Link>
             <button type="button" onClick={() => setLang((current) => (current === "zh" ? "en" : "zh"))} aria-label={text(lang, "切换到英文", "Switch to Chinese")}>
               {lang === "zh" ? "EN" : "中文"}
@@ -1087,6 +1144,7 @@ export function PluginHub({
                     onCopy={copy}
                     view="list"
                     query=""
+                    expanded={expandedId === plugin.id}
                   />
                 ))}
               </div>
@@ -1160,6 +1218,14 @@ export function PluginHub({
                   >
                     {text(lang, "全部", "All")} <small>{preCategory.length}</small>
                   </Link>
+                  <button
+                    type="button"
+                    className={evidence === "installable" ? "is-active" : ""}
+                    onClick={() => setEvidence((current) => (current === "installable" ? "all" : "installable"))}
+                    aria-pressed={evidence === "installable"}
+                  >
+                    {text(lang, "可正式安装", "Installable")}
+                  </button>
                   {CATEGORY_ORDER.map((id) => (
                     <Link
                       className={category === id ? "is-active" : ""}
@@ -1252,6 +1318,7 @@ export function PluginHub({
                     <button className={view === "cards" ? "is-active" : ""} type="button" onClick={() => setView("cards")} aria-label={text(lang, "卡片视图", "Card view")} aria-pressed={view === "cards"}>{text(lang, "网格", "Grid")}</button>
                   </div>
                 </div>
+                <p className="catalog-hint">{text(lang, "j / k 选择 · Enter 展开 · c 复制 · / 搜索 · Esc 收起", "j / k select · Enter expand · c copy · / search · Esc collapse")}</p>
                 {(query.trim() || owner || category !== "all" || evidence !== "all") && (
                   <div className="filter-summary">
                     {query.trim() && <button type="button" onClick={() => setQuery("")}>{text(lang, `搜索：${query.trim()}`, `Search: ${query.trim()}`)} ×</button>}
@@ -1283,7 +1350,7 @@ export function PluginHub({
                 ) : (
                   <div className="empty-state">
                     <strong>{evidence === "favorites" && favorites.length === 0 ? text(lang, "还没有收藏", "No saved plugins yet") : text(lang, "没有匹配的插件", "No matching plugins")}</strong>
-                    <p>{evidence === "favorites" && favorites.length === 0 ? text(lang, "在卡片右侧点星标，就能在这里集中查看。", "Tap the star on a card to save it here.") : text(lang, "换个关键词或清空筛选条件。", "Try another keyword or reset the filters.")}</p>
+                    <p>{evidence === "favorites" && favorites.length === 0 ? text(lang, "在名单右侧点星标，就能在这里集中查看。", "Tap the star on a row to save it here.") : text(lang, "换个关键词或清空筛选条件。", "Try another keyword or reset the filters.")}</p>
                     <button type="button" onClick={() => { setQuery(""); setOwner(""); setCategory("all"); setEvidence("all"); }}>{text(lang, "清空筛选", "Reset filters")}</button>
                     <div className="empty-state__hints">
                       {CATEGORY_ORDER.slice(0, 6).map((id) => (
@@ -1315,7 +1382,7 @@ export function PluginHub({
                       <em>★ {formatNumber(plugin.stars, lang)}</em>
                       <span className={`signal signal--${plugin.attention.level}`}>{signalLabel(plugin, lang)}</span>
                     </Link>
-                    <button className="copy-install" type="button" onClick={() => copy(pluginInstallCommand(plugin), `${plugin.id}-rank`)} aria-label={text(lang, "复制安装命令", "Copy install command")}>{copied === `${plugin.id}-rank` ? "✓" : "⎘"}</button>
+                    <button className="copy-install" type="button" onClick={() => copy(pluginInstallCommand(plugin), `${plugin.id}-rank`)} aria-label={text(lang, "复制安装命令", "Copy install command")}>{copied === `${plugin.id}-rank` ? text(lang, "已复制", "Copied") : <IconCopy />}</button>
                   </li>
                 ))}</ol>
               </div>
@@ -1329,7 +1396,7 @@ export function PluginHub({
                       <em>{relativeDate(plugin.pushedAt, lang)}</em>
                       <span className={`signal signal--${plugin.attention.level}`}>{signalLabel(plugin, lang)}</span>
                     </Link>
-                    <button className="copy-install" type="button" onClick={() => copy(pluginInstallCommand(plugin), `${plugin.id}-fresh`)} aria-label={text(lang, "复制安装命令", "Copy install command")}>{copied === `${plugin.id}-fresh` ? "✓" : "⎘"}</button>
+                    <button className="copy-install" type="button" onClick={() => copy(pluginInstallCommand(plugin), `${plugin.id}-fresh`)} aria-label={text(lang, "复制安装命令", "Copy install command")}>{copied === `${plugin.id}-fresh` ? text(lang, "已复制", "Copied") : <IconCopy />}</button>
                   </li>
                 ))}</ol>
               </div>
@@ -1362,8 +1429,7 @@ export function PluginHub({
         {page === "plugin" && selected && (
           <section className="shell page-section plugin-page">
             <div className="plugin-page__top">
-              <span>PLUGIN {String(selected.order + 1).padStart(3, "0")}</span>
-              <Link href={catalogHref} prefetch={false}>{text(lang, "返回目录", "Back to catalog")} →</Link>
+              <Link href={catalogHref} prefetch={false}>{text(lang, "返回目录", "Back to catalog")}</Link>
             </div>
             <PluginDetail
               plugin={selected}
@@ -1412,7 +1478,7 @@ export function PluginHub({
       </main>
 
       <footer className="site-footer">
-        <span>DSH PLUGIN HUB · {data.summary.listed} LISTED · {data.summary.autoDiscovered} AUTO · 30 MIN</span>
+        <span>{text(lang, `社区索引 · ${data.summary.listed} 个插件 · ${data.summary.autoDiscovered} 个自动发现 · 每 30 MIN 同步`, `Community index · ${data.summary.listed} listed · ${data.summary.autoDiscovered} auto · every 30 MIN`)}</span>
         <span>{text(lang, "社区索引 · 与 DeepSeek AI 无隶属关系", "Community index · not affiliated with DeepSeek AI")}</span>
         <Link href="/api/plugins">JSON API</Link>
       </footer>
