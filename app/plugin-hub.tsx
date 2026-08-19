@@ -121,7 +121,7 @@ function pluginPath(plugin: PluginRecord) {
 }
 
 function preferDedicatedPluginPage() {
-  return typeof window !== "undefined" && window.matchMedia("(max-width: 980px)").matches;
+  return typeof window !== "undefined" && window.matchMedia("(max-width: 760px)").matches;
 }
 
 function openInDrawer(event: MouseEvent<HTMLAnchorElement>, onOpen: () => void) {
@@ -273,7 +273,6 @@ function PluginDetail({
       <ul className="check-pills" aria-label={text(lang, "检查项", "Checklist")}>
         {CHECK_ITEMS.map(([id, zh, en]) => (
           <li key={id} className={plugin.screening.checks[id] ? "is-on" : "is-off"}>
-            <span aria-hidden="true">{plugin.screening.checks[id] ? "✓" : "–"}</span>
             {text(lang, zh, en)}
           </li>
         ))}
@@ -330,7 +329,7 @@ function PluginDetail({
         {plugin.homepage && /^https?:\/\//u.test(plugin.homepage) && (
           <a className="secondary-button" href={plugin.homepage} target="_blank" rel="noreferrer">{text(lang, "打开主页", "Open homepage")} ↗</a>
         )}
-        <button className={`secondary-button ${favorite ? "is-active" : ""}`} type="button" onClick={onFavorite}>★ {text(lang, favorite ? "已收藏" : "收藏", favorite ? "Saved" : "Save")}</button>
+        <button className={`secondary-button ${favorite ? "is-active" : ""}`} type="button" onClick={onFavorite}><IconStar filled={favorite} /> {text(lang, favorite ? "已收藏" : "收藏", favorite ? "Saved" : "Save")}</button>
         <button className="secondary-button" type="button" onClick={onShare}>{copied === `${plugin.id}-link` ? text(lang, "链接已复制", "Link copied") : text(lang, "分享链接", "Share link")}</button>
       </div>
       {(previous || next) && (
@@ -454,9 +453,14 @@ function PluginCard({
                     : text(lang, "复制建议命令", "Copy suggested command")}
             </button>
           </div>
-          <Link className="text-button" href={pluginPath(plugin)} prefetch={false}>
-            {text(lang, "查看完整检查记录", "Open full screening record")} →
-          </Link>
+          <div className="plugin-card__detail-links">
+            <Link className="text-button" href={pluginPath(plugin)} prefetch={false}>
+              {text(lang, "查看完整检查记录", "Open full screening record")} →
+            </Link>
+            <Link className="text-button" href={`/plugins?owner=${encodeURIComponent(plugin.owner)}`} prefetch={false}>
+              {text(lang, `只看 ${plugin.owner}`, `More by ${plugin.owner}`)}
+            </Link>
+          </div>
         </div>
       )}
       <div className="plugin-card__actions">
@@ -944,24 +948,25 @@ export function PluginHub({
   }, [filterKey]);
 
   useEffect(() => {
-    if (page !== "catalog" || selected) return;
+    if ((page !== "catalog" && page !== "home") || selected) return;
+    const rows = page === "catalog" ? visiblePlugins : data.plugins.slice(0, 6);
     const onKey = (event: KeyboardEvent) => {
       const typing = event.target instanceof HTMLElement && ["INPUT", "TEXTAREA", "SELECT"].includes(event.target.tagName);
       if (typing || suggestOpen || event.metaKey || event.ctrlKey || event.altKey) return;
       if (event.key === "j" || event.key === "ArrowDown") {
         event.preventDefault();
-        setCursor((current) => Math.min((current < 0 ? -1 : current) + 1, visiblePlugins.length - 1));
+        setCursor((current) => Math.min((current < 0 ? -1 : current) + 1, rows.length - 1));
       }
       if (event.key === "k" || event.key === "ArrowUp") {
         event.preventDefault();
         setCursor((current) => Math.max(current < 0 ? 0 : current - 1, 0));
       }
-      if (event.key === "Enter" && cursor >= 0 && visiblePlugins[cursor]) {
+      if (event.key === "Enter" && cursor >= 0 && rows[cursor]) {
         event.preventDefault();
-        openPlugin(visiblePlugins[cursor]);
+        openPlugin(rows[cursor]);
       }
       if ((event.key === "c" || event.key === "C") && !event.shiftKey) {
-        const plugin = (expandedId && visiblePlugins.find((item) => item.id === expandedId)) || (cursor >= 0 ? visiblePlugins[cursor] : null);
+        const plugin = (expandedId && rows.find((item) => item.id === expandedId)) || (cursor >= 0 ? rows[cursor] : null);
         if (!plugin) return;
         event.preventDefault();
         copy(pluginInstallCommand(plugin), `${plugin.id}-card`);
@@ -969,7 +974,12 @@ export function PluginHub({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [copy, cursor, expandedId, openPlugin, page, selected, suggestOpen, visiblePlugins]);
+  }, [copy, cursor, data.plugins, expandedId, openPlugin, page, selected, suggestOpen, visiblePlugins]);
+
+  useEffect(() => {
+    if (!preferencesReady || page !== "catalog" || !initialQuery.trim()) return;
+    document.querySelector<HTMLInputElement>(".catalog-toolbar input")?.focus();
+  }, [initialQuery, page, preferencesReady]);
 
   useEffect(() => {
     if (cursor < 0) return;
@@ -1082,7 +1092,8 @@ export function PluginHub({
               {lang === "zh" ? "EN" : "中文"}
             </button>
             <button type="button" onClick={() => setTheme((current) => (current === "dark" ? "light" : "dark"))} aria-label={text(lang, "切换主题", "Toggle theme")}>
-              {theme === "dark" ? text(lang, "浅色", "Light") : text(lang, "深色", "Dark")}
+              <span className="theme-mark" aria-hidden="true" />
+              <span className="theme-label">{theme === "dark" ? text(lang, "浅色", "Light") : text(lang, "深色", "Dark")}</span>
             </button>
           </div>
         </div>
@@ -1112,7 +1123,7 @@ export function PluginHub({
                       value={homeQuery}
                       onChange={(event) => setHomeQuery(event.target.value)}
                       aria-label={text(lang, "搜索插件", "Search plugins")}
-                      placeholder={text(lang, "搜索名称、作者、仓库或能力，按 / 聚焦", "Search name, author, repo, or capability. Press /")}
+                      placeholder={text(lang, "搜索名称、作者或仓库", "Search name, author, or repo")}
                     />
                   </label>
                   <button className="primary-button" type="submit">{text(lang, "搜索插件", "Search plugins")}</button>
@@ -1259,7 +1270,7 @@ export function PluginHub({
                         aria-autocomplete="list"
                         aria-expanded={suggestOpen && suggestions.length > 0}
                         aria-controls="catalog-suggest"
-                        placeholder={text(lang, "搜索名称、作者、仓库或能力，Esc 清空", "Search name, author, repo, or capability. Esc clears")}
+                        placeholder={text(lang, "搜索插件", "Search plugins")}
                       />
                       {query && <button type="button" onClick={() => { setQuery(""); setSuggestOpen(false); }} aria-label={text(lang, "清空搜索", "Clear search")}>×</button>}
                     </label>
