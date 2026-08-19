@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Noto_Sans_SC, Source_Sans_3 } from "next/font/google";
+import { Noto_Sans_SC, Noto_Serif_SC, Source_Sans_3 } from "next/font/google";
 import { cookies } from "next/headers";
 import "./globals.css";
 
@@ -14,6 +14,13 @@ const notoSans = Noto_Sans_SC({
   subsets: ["latin"],
   weight: ["400", "500", "700"],
   variable: "--font-noto",
+  display: "swap",
+});
+
+const notoSerif = Noto_Serif_SC({
+  subsets: ["latin"],
+  weight: ["600", "700"],
+  variable: "--font-serif",
   display: "swap",
 });
 
@@ -33,8 +40,8 @@ const sharedMetadata: Metadata = {
 export const viewport: Viewport = {
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f2f2f0" },
-    { media: "(prefers-color-scheme: dark)", color: "#111111" },
+    { media: "(prefers-color-scheme: light)", color: "#c73a2a" },
+    { media: "(prefers-color-scheme: dark)", color: "#2a100e" },
   ],
 };
 
@@ -76,10 +83,10 @@ export default async function RootLayout({
   const initialLanguage = cookieStore.get("dsh-plugin-hub-lang")?.value === "en" ? "en" : "zh-CN";
   const initialTheme = cookieStore.get("dsh-plugin-hub-theme")?.value === "dark" ? "dark" : "light";
   return (
-    <html lang={initialLanguage} data-theme={initialTheme} className={`${sourceSans.variable} ${notoSans.variable}`} suppressHydrationWarning>
+    <html lang={initialLanguage} data-theme={initialTheme} className={`${sourceSans.variable} ${notoSans.variable} ${notoSerif.variable}`} suppressHydrationWarning>
       <head><script dangerouslySetInnerHTML={{ __html: preferenceBootstrap }} /></head>
       <body>
-        <div hidden dangerouslySetInnerHTML={{ __html: `<!-- THESIS: One-ink index of install evidence. Not a navy rail, not a yellow airport, not a black newspaper bar, not a wireframe. OWN-WORLD: Paper field, one black ink, invert for the action that matters, humanist sans, 10px controls. STORY: Search, scan a name, read the check, copy a pinned command. FIRST VIEWPORT: Light header, reading-size headline, search, then the name list. FORM: Brief-pinned black-white; seed 3414a729 reroll raised by type-specimen scale. No footer author. FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance -->` }} />
+        <div hidden dangerouslySetInnerHTML={{ __html: `<!-- THESIS: A vermilion washi field of install evidence. Color owns the first viewport; the list sits on bone paper. Not navy wayfinding, not one-ink wireframe, not a card market. OWN-WORLD: Cinnabar #c73a2a, bone #f6f1ea, sumi #1c1412, gold slash, Noto Serif display. STORY: Search on the red field, scan names on bone, copy a pinned command. FIRST VIEWPORT: Vermilion from the header through the headline and search; the name list begins on bone. FORM: Orizuru washi challenger, seed afa0eeef, raised by seedbed color-as-field. No footer author. FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance -->` }} />
         {children}
       </body>
     </html>

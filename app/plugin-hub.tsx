@@ -987,7 +987,7 @@ export function PluginHub({
     : text(lang, "内置数据兜底", "Bundled fallback");
 
   return (
-    <div className="hub" data-theme={theme} data-lang={lang}>
+    <div className="hub" data-theme={theme} data-lang={lang} data-page={page}>
       <a className="skip-link" href="#main-content">{text(lang, "跳到主要内容", "Skip to content")}</a>
       <header className="site-header">
         <div className="site-header__inner">

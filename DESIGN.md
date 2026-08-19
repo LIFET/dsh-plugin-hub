@@ -4,26 +4,26 @@
 
 ## World
 
-一管墨。浅纸底，深字，反相当主操作。没有海军蓝侧栏，没有信号黄，没有黑刊头条。
+朱砂宣纸。首屏是一整块朱砂，名单落在骨色纸上。金色只给斜杠和细边。底部不写作者。
 
 ## Color
 
-- Paper: `#f2f2f0` / `#111111`
-- Surface: `#ffffff` / `#1a1a1a`
-- Ink: `#111111` / `#f2f2f0`
-- Rule: `#e2e2de` / `#2a2a2a`
-- Invert: 墨底纸字
-- 无彩色品牌色
+- Cinnabar: `#c73a2a` / `#e25a48`
+- Bone: `#f6f1ea` / `#1c1412`
+- Cream: `#fff6f0`
+- Sumi: `#1c1412` / `#f6f1ea`
+- Gold: `#b8892a`
 
 ## Type
 
+- Display: Noto Serif SC
 - UI: Source Sans 3 + Noto Sans SC
 - Mono: 仓库、命令、数字
 
 ## Components
 
-- 顶栏：纸色，当前项反相
-- 主按钮：10px 圆角墨底
-- 搜索：白底墨线
-- 名单：纸面上的横线
+- 顶栏和首页搜索在朱砂上
+- 主按钮：朱砂胶囊
+- 当前导航：奶油底朱红字
+- 名单在骨纸上，点行展开
 - 页脚不写作者
