@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Noto_Sans_SC, Noto_Serif_SC, Source_Sans_3 } from "next/font/google";
+import { Noto_Sans_SC, Source_Sans_3 } from "next/font/google";
 import { cookies } from "next/headers";
 import "./globals.css";
 
@@ -14,13 +14,6 @@ const notoSans = Noto_Sans_SC({
   subsets: ["latin"],
   weight: ["400", "500", "700"],
   variable: "--font-noto",
-  display: "swap",
-});
-
-const notoSerif = Noto_Serif_SC({
-  subsets: ["latin"],
-  weight: ["600", "700"],
-  variable: "--font-serif",
   display: "swap",
 });
 
@@ -40,8 +33,8 @@ const sharedMetadata: Metadata = {
 export const viewport: Viewport = {
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#c73a2a" },
-    { media: "(prefers-color-scheme: dark)", color: "#2a100e" },
+    { media: "(prefers-color-scheme: light)", color: "#f4f5f3" },
+    { media: "(prefers-color-scheme: dark)", color: "#101412" },
   ],
 };
 
@@ -83,10 +76,10 @@ export default async function RootLayout({
   const initialLanguage = cookieStore.get("dsh-plugin-hub-lang")?.value === "en" ? "en" : "zh-CN";
   const initialTheme = cookieStore.get("dsh-plugin-hub-theme")?.value === "dark" ? "dark" : "light";
   return (
-    <html lang={initialLanguage} data-theme={initialTheme} className={`${sourceSans.variable} ${notoSans.variable} ${notoSerif.variable}`} suppressHydrationWarning>
+    <html lang={initialLanguage} data-theme={initialTheme} className={`${sourceSans.variable} ${notoSans.variable}`} suppressHydrationWarning>
       <head><script dangerouslySetInnerHTML={{ __html: preferenceBootstrap }} /></head>
       <body>
-        <div hidden dangerouslySetInnerHTML={{ __html: `<!-- THESIS: A vermilion washi field of install evidence. Color owns the first viewport; the list sits on bone paper. Not navy wayfinding, not one-ink wireframe, not a card market. OWN-WORLD: Cinnabar #c73a2a, bone #f6f1ea, sumi #1c1412, gold slash, Noto Serif display. STORY: Search on the red field, scan names on bone, copy a pinned command. FIRST VIEWPORT: Vermilion from the header through the headline and search; the name list begins on bone. FORM: Orizuru washi challenger, seed afa0eeef, raised by seedbed color-as-field. No footer author. FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance -->` }} />
+        <div hidden dangerouslySetInnerHTML={{ __html: `<!-- THESIS: A working catalog. Search, then names, then evidence, then a pinned command. Not a color costume. OWN-WORLD: Cool paper, white list panel, one teal for action and current, one sans. STORY: Find a plugin, read the check, copy the command. FIRST VIEWPORT: Light header. One-line job. Search. The list starts in the same view. Catalog: filters left, results right. FORM: Product tool, not a theme. No footer author. FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance -->` }} />
         {children}
       </body>
     </html>
