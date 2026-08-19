@@ -1,12 +1,12 @@
 import type { Metadata, Viewport } from "next";
-import { Barlow, Noto_Sans_SC } from "next/font/google";
+import { Noto_Sans_SC, Source_Sans_3 } from "next/font/google";
 import { cookies } from "next/headers";
 import "./globals.css";
 
-const barlow = Barlow({
+const sourceSans = Source_Sans_3({
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  variable: "--font-barlow",
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-source",
   display: "swap",
 });
 
@@ -33,8 +33,8 @@ const sharedMetadata: Metadata = {
 export const viewport: Viewport = {
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#0b1f33" },
-    { media: "(prefers-color-scheme: dark)", color: "#07131f" },
+    { media: "(prefers-color-scheme: light)", color: "#f2f2f0" },
+    { media: "(prefers-color-scheme: dark)", color: "#111111" },
   ],
 };
 
@@ -76,10 +76,10 @@ export default async function RootLayout({
   const initialLanguage = cookieStore.get("dsh-plugin-hub-lang")?.value === "en" ? "en" : "zh-CN";
   const initialTheme = cookieStore.get("dsh-plugin-hub-theme")?.value === "dark" ? "dark" : "light";
   return (
-    <html lang={initialLanguage} data-theme={initialTheme} className={`${barlow.variable} ${notoSans.variable}`} suppressHydrationWarning>
+    <html lang={initialLanguage} data-theme={initialTheme} className={`${sourceSans.variable} ${notoSans.variable}`} suppressHydrationWarning>
       <head><script dangerouslySetInnerHTML={{ __html: preferenceBootstrap }} /></head>
       <body>
-        <div hidden dangerouslySetInnerHTML={{ __html: `<!-- THESIS: A wayfinding board of install evidence, not a framed drawing, newspaper masthead, or card market. OWN-WORLD: Navy rail, sky field, signal yellow for the current route, one grotesque. No author plaque. STORY: Search, scan a name, read the check, copy a pinned command. FIRST VIEWPORT: Left destinations, right the list. Names are large. Search is the from-field. FORM: Airport wayfinding, seed 3414a729 assigned #6, raised by type-specimen scale and Kraftwerk one-signal color; brief 简洁有设计感, no footer author. FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance -->` }} />
+        <div hidden dangerouslySetInnerHTML={{ __html: `<!-- THESIS: One-ink index of install evidence. Not a navy rail, not a yellow airport, not a black newspaper bar, not a wireframe. OWN-WORLD: Paper field, one black ink, invert for the action that matters, humanist sans, 10px controls. STORY: Search, scan a name, read the check, copy a pinned command. FIRST VIEWPORT: Light header, reading-size headline, search, then the name list. FORM: Brief-pinned black-white; seed 3414a729 reroll raised by type-specimen scale. No footer author. FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance -->` }} />
         {children}
       </body>
     </html>

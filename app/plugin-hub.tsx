@@ -989,8 +989,6 @@ export function PluginHub({
   return (
     <div className="hub" data-theme={theme} data-lang={lang}>
       <a className="skip-link" href="#main-content">{text(lang, "跳到主要内容", "Skip to content")}</a>
-      <div className="app">
-      <aside className="rail">
       <header className="site-header">
         <div className="site-header__inner">
           <Link className="brand" href="/" prefetch={false}>
@@ -1030,8 +1028,6 @@ export function PluginHub({
           </div>
         </div>
       </header>
-      </aside>
-      <div className="stage">
       <main id="main-content">
         {page === "home" && (
           <>
@@ -1439,8 +1435,6 @@ export function PluginHub({
         <span>{text(lang, "社区索引 · 与 DeepSeek AI 无隶属关系", "Community index · not affiliated with DeepSeek AI")}</span>
         <Link href="/api/plugins">JSON API</Link>
       </footer>
-      </div>
-      </div>
       {copyMessage && <div className="toast" role="status" aria-live="polite">{copyMessage}</div>}
     </div>
   );
