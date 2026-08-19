@@ -1,12 +1,17 @@
 import type { Metadata, Viewport } from "next";
-import { Noto_Sans_SC, Source_Sans_3 } from "next/font/google";
+import { Geist, Geist_Mono, Noto_Sans_SC } from "next/font/google";
 import { cookies } from "next/headers";
 import "./globals.css";
 
-const sourceSans = Source_Sans_3({
+const geist = Geist({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-source",
+  variable: "--font-geist",
+  display: "swap",
+});
+
+const geistMono = Geist_Mono({
+  subsets: ["latin"],
+  variable: "--font-geist-mono",
   display: "swap",
 });
 
@@ -33,8 +38,8 @@ const sharedMetadata: Metadata = {
 export const viewport: Viewport = {
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f2f2f7" },
-    { media: "(prefers-color-scheme: dark)", color: "#000000" },
+    { media: "(prefers-color-scheme: light)", color: "#eef1ec" },
+    { media: "(prefers-color-scheme: dark)", color: "#0e1210" },
   ],
 };
 
@@ -76,10 +81,10 @@ export default async function RootLayout({
   const initialLanguage = cookieStore.get("dsh-plugin-hub-lang")?.value === "en" ? "en" : "zh-CN";
   const initialTheme = cookieStore.get("dsh-plugin-hub-theme")?.value === "dark" ? "dark" : "light";
   return (
-    <html lang={initialLanguage} data-theme={initialTheme} className={`${sourceSans.variable} ${notoSans.variable}`} suppressHydrationWarning>
+    <html lang={initialLanguage} data-theme={initialTheme} className={`${geist.variable} ${geistMono.variable} ${notoSans.variable}`} suppressHydrationWarning>
       <head><script dangerouslySetInnerHTML={{ __html: preferenceBootstrap }} /></head>
       <body>
-        <div hidden dangerouslySetInnerHTML={{ __html: `<!-- THESIS: A split-view catalog. Sidebar for place, content for search and names. OWN-WORLD: Grouped canvas, white content, one tint, system-like rows. STORY: Find, check, copy. FIRST VIEWPORT: Sidebar routes; content has the job line, search, then an inset list. FORM: Premium Neutral applied to a web tool. No footer author. FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance -->` }} />
+        <div hidden dangerouslySetInnerHTML={{ __html: `<!-- THESIS: A search-led plugin index. First viewport is the job: type a name, land in a list, copy a pinned command. Refuses split-view settings chrome and costume worlds. OWN-WORLD: Cool stone canvas #eef1ec, white list sheet, ink #121714, pine #0a5c42 only on the job. Geist + Noto Sans SC. Hairline lists, not cards. STORY: Find a plugin, read screening, copy a commit-pinned install command. FIRST VIEWPORT: Slim topbar; large job line; search with pine submit; category text chips; then a white list of screened plugins. FORM: User-pinned unattended rebuild after costume and settings-clone rejections. FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance -->` }} />
         {children}
       </body>
     </html>

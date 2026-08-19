@@ -4,25 +4,28 @@
 
 ## World
 
-分栏目录。左边是位置，右边是搜索和名单。列表是一组 inset，不是一张张卡片。底部不写作者。
+搜索当入口、名单当主体的插件索引。石色画布上放白名单，松绿只出现在搜索、安装和选中。不做分栏设置页，也不做装扮主题。底部不写作者。
 
 ## Color
 
-- Canvas: `#f2f2f7` / `#000000`
-- Surface: `#ffffff` / `#1c1c1e`
-- Ink: `#1c1c1e` / `#f2f2f7`
-- Tint: `#0a7aff` / `#0a84ff`
+- Canvas: `#eef1ec` / `#0e1210`
+- Surface: `#ffffff` / `#171c19`
+- Ink: `#121714` / `#e8eee9`
+- Muted: `#4e5752` / `#9aa69e`
+- Pine: `#0a5c42` / `#3dba86`
+- Warn: `#8a5a00` / `#e0b44a`
+- Bad: `#b42318` / `#f07167`
 
 ## Type
 
-- UI: Source Sans 3 + Noto Sans SC
+- UI: Geist + Noto Sans SC
+- Mono: Geist Mono，用于仓库、命令、数字
 - 字重以 regular / medium / semibold 为主
-- Mono: 仓库、命令、数字
 
 ## Components
 
-- 侧栏：路由 + 分类
-- 内容：搜索、证据、排序、名单
-- 名单行：分隔线，无卡片阴影
-- 主按钮：tint
+- 通栏顶栏：字标、路由、语言/主题
+- 首页：任务句、搜索、分类文字、白名单
+- 目录：分类、筛选、名单行，点开看检查与命令
+- 安装命令：深色代码条，复制是主操作
 - 页脚不写作者
