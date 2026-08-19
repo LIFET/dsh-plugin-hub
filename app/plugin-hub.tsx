@@ -989,45 +989,69 @@ export function PluginHub({
   return (
     <div className="hub" data-theme={theme} data-lang={lang} data-page={page}>
       <a className="skip-link" href="#main-content">{text(lang, "跳到主要内容", "Skip to content")}</a>
-      <header className="site-header">
-        <div className="site-header__inner">
-          <Link className="brand" href="/" prefetch={false}>
-            <span className="brand__mark">dsh</span>
-            <span className="brand__name">{text(lang, "插件资源站", "Plugin Hub")}</span>
-            <span className="sr-only">{text(lang, "，返回首页", ", back home")}</span>
-          </Link>
-          <nav className="main-nav" aria-label={text(lang, "主导航", "Main navigation")}>
-            {PAGES.map((item) => (
+      <aside className="split-sidebar">
+        <Link className="brand" href="/" prefetch={false}>
+          <span className="brand__mark">dsh</span>
+          <span className="brand__name">{text(lang, "插件资源站", "Plugin Hub")}</span>
+          <span className="sr-only">{text(lang, "，返回首页", ", back home")}</span>
+        </Link>
+        <nav className="main-nav" aria-label={text(lang, "主导航", "Main navigation")}>
+          {PAGES.map((item) => (
+            <Link
+              className={page === item.id ? "is-active" : ""}
+              href={item.id === "catalog" ? catalogHref : PAGE_PATHS[item.id]}
+              prefetch={false}
+              key={item.id}
+              aria-current={page === item.id ? "page" : undefined}
+            >
+              {item[lang]}
+            </Link>
+          ))}
+        </nav>
+        {page === "catalog" && (
+          <div className="category-chips" aria-label={text(lang, "分类", "Categories")}>
+            <Link
+              className={category === "all" ? "is-active" : ""}
+              href={catalogHrefFor({ query, owner, category: "all", sort, evidence })}
+              prefetch={false}
+              onClick={(event) => { event.preventDefault(); setCategory("all"); }}
+              aria-current={category === "all" ? "page" : undefined}
+            >
+              {text(lang, "全部", "All")} <small>{preCategory.length}</small>
+            </Link>
+            {CATEGORY_ORDER.map((id) => (
               <Link
-                className={page === item.id ? "is-active" : ""}
-                href={item.id === "catalog" ? catalogHref : PAGE_PATHS[item.id]}
+                className={category === id ? "is-active" : ""}
+                href={catalogHrefFor({ query, owner, category: id, sort, evidence })}
                 prefetch={false}
-                key={item.id}
-                aria-current={page === item.id ? "page" : undefined}
+                key={id}
+                onClick={(event) => { event.preventDefault(); setCategory(id); }}
+                aria-current={category === id ? "page" : undefined}
               >
-                {item[lang]}
+                {data.categories[id][lang]} <small>{categoryCounts[id]}</small>
               </Link>
             ))}
-          </nav>
-          <div className="header-actions">
-            <Link
-              className={`favorite-link ${evidence === "favorites" ? "is-active" : ""}`}
-              href="/plugins?evidence=favorites"
-              prefetch={false}
-              title={text(lang, "查看收藏", "View favorites")}
-              aria-label={text(lang, `查看收藏，${favorites.length} 项`, `View ${favorites.length} saved plugins`)}
-            >
-              ★ <span>{favorites.length}</span>
-            </Link>
-            <button type="button" onClick={() => setLang((current) => (current === "zh" ? "en" : "zh"))} aria-label={text(lang, "切换到英文", "Switch to Chinese")}>
-              {lang === "zh" ? "EN" : "中文"}
-            </button>
-            <button type="button" onClick={() => setTheme((current) => (current === "dark" ? "light" : "dark"))} aria-label={text(lang, "切换主题", "Toggle theme")}>
-              {theme === "dark" ? "☀" : "☾"}
-            </button>
           </div>
+        )}
+        <div className="header-actions">
+          <Link
+            className={`favorite-link ${evidence === "favorites" ? "is-active" : ""}`}
+            href="/plugins?evidence=favorites"
+            prefetch={false}
+            title={text(lang, "查看收藏", "View favorites")}
+            aria-label={text(lang, `查看收藏，${favorites.length} 项`, `View ${favorites.length} saved plugins`)}
+          >
+            ★ <span>{favorites.length}</span>
+          </Link>
+          <button type="button" onClick={() => setLang((current) => (current === "zh" ? "en" : "zh"))} aria-label={text(lang, "切换到英文", "Switch to Chinese")}>
+            {lang === "zh" ? "EN" : "中文"}
+          </button>
+          <button type="button" onClick={() => setTheme((current) => (current === "dark" ? "light" : "dark"))} aria-label={text(lang, "切换主题", "Toggle theme")}>
+            {theme === "dark" ? "☀" : "☾"}
+          </button>
         </div>
-      </header>
+      </aside>
+      <div className="split-content">
       <main id="main-content">
         {page === "home" && (
           <>
@@ -1156,57 +1180,7 @@ export function PluginHub({
                 {copied === "catalog-link" ? text(lang, "链接已复制", "Link copied") : text(lang, "复制筛选链接", "Copy filter link")}
               </button>
             </div>
-            <div className="catalog-layout">
-              <aside className="catalog-aside" aria-label={text(lang, "筛选", "Filters")}>
-                <div className="category-chips">
-                  <Link
-                    className={category === "all" ? "is-active" : ""}
-                    href={catalogHrefFor({ query, owner, category: "all", sort, evidence })}
-                    prefetch={false}
-                    onClick={(event) => { event.preventDefault(); setCategory("all"); }}
-                    aria-current={category === "all" ? "page" : undefined}
-                  >
-                    {text(lang, "全部", "All")} <small>{preCategory.length}</small>
-                  </Link>
-                  {CATEGORY_ORDER.map((id) => (
-                    <Link
-                      className={category === id ? "is-active" : ""}
-                      href={catalogHrefFor({ query, owner, category: id, sort, evidence })}
-                      prefetch={false}
-                      key={id}
-                      onClick={(event) => { event.preventDefault(); setCategory(id); }}
-                      aria-current={category === id ? "page" : undefined}
-                    >
-                      {data.categories[id][lang]} <small>{categoryCounts[id]}</small>
-                    </Link>
-                  ))}
-                </div>
-                <label className="aside-field">
-                  <span>{text(lang, "证据", "Evidence")}</span>
-                  <select value={evidence} onChange={(event) => setEvidence(event.target.value as EvidenceFilter)} aria-label={text(lang, "证据筛选", "Evidence filter")}>
-                    <option value="all">{text(lang, "全部证据状态", "All evidence")}</option>
-                    <option value="auto">{text(lang, "网站自动发现", "Auto-discovered")}</option>
-                    <option value="topic">{text(lang, "已匹配 GitHub 话题", "Matched GitHub topic")}</option>
-                    <option value="manifest">{text(lang, "已识别 manifest", "Manifest found")}</option>
-                    <option value="clear">{text(lang, "静态检查通过", "Static scan clear")}</option>
-                    <option value="installable">{text(lang, "可正式安装", "Official install")}</option>
-                    <option value="review">{text(lang, "待复核或已拦截", "Review or blocked")}</option>
-                    <option value="favorites">{text(lang, "只看收藏", "Favorites only")}</option>
-                  </select>
-                </label>
-                <label className="aside-field">
-                  <span>{text(lang, "排序", "Sort")}</span>
-                  <select value={sort} onChange={(event) => setSort(event.target.value as SortId)} aria-label={text(lang, "排序", "Sort") }>
-                    <option value="evidence">{text(lang, "按证据优先", "Evidence first")}</option>
-                    <option value="curated">{text(lang, "精选顺序", "Curated order")}</option>
-                    <option value="stars">{text(lang, "按星标", "By stars")}</option>
-                    <option value="updated">{text(lang, "最近更新", "Recently pushed")}</option>
-                    <option value="added">{text(lang, "最近收录", "Recently added")}</option>
-                    <option value="name">{text(lang, "名称 A→Z", "Name A→Z")}</option>
-                  </select>
-                </label>
-              </aside>
-              <div className="catalog-main">
+            <div className="catalog-main">
                 <div className="catalog-toolbar">
                   <div className="search-combo">
                     <label className="search-field">
@@ -1263,6 +1237,24 @@ export function PluginHub({
                       </ul>
                     )}
                   </div>
+                  <select value={evidence} onChange={(event) => setEvidence(event.target.value as EvidenceFilter)} aria-label={text(lang, "证据筛选", "Evidence filter")}>
+                    <option value="all">{text(lang, "全部证据状态", "All evidence")}</option>
+                    <option value="auto">{text(lang, "网站自动发现", "Auto-discovered")}</option>
+                    <option value="topic">{text(lang, "已匹配 GitHub 话题", "Matched GitHub topic")}</option>
+                    <option value="manifest">{text(lang, "已识别 manifest", "Manifest found")}</option>
+                    <option value="clear">{text(lang, "静态检查通过", "Static scan clear")}</option>
+                    <option value="installable">{text(lang, "可正式安装", "Official install")}</option>
+                    <option value="review">{text(lang, "待复核或已拦截", "Review or blocked")}</option>
+                    <option value="favorites">{text(lang, "只看收藏", "Favorites only")}</option>
+                  </select>
+                  <select value={sort} onChange={(event) => setSort(event.target.value as SortId)} aria-label={text(lang, "排序", "Sort") }>
+                    <option value="evidence">{text(lang, "按证据优先", "Evidence first")}</option>
+                    <option value="curated">{text(lang, "精选顺序", "Curated order")}</option>
+                    <option value="stars">{text(lang, "按星标", "By stars")}</option>
+                    <option value="updated">{text(lang, "最近更新", "Recently pushed")}</option>
+                    <option value="added">{text(lang, "最近收录", "Recently added")}</option>
+                    <option value="name">{text(lang, "名称 A→Z", "Name A→Z")}</option>
+                  </select>
                   <div className="view-switch" role="group" aria-label={text(lang, "视图", "View") }>
                     <button className={view === "list" ? "is-active" : ""} type="button" onClick={() => setView("list")} aria-label={text(lang, "列表视图", "List view")} aria-pressed={view === "list"}>☰</button>
                     <button className={view === "cards" ? "is-active" : ""} type="button" onClick={() => setView("cards")} aria-label={text(lang, "卡片视图", "Card view")} aria-pressed={view === "cards"}>▦</button>
@@ -1311,7 +1303,6 @@ export function PluginHub({
                   </div>
                 )}
                 {hasMore && <button ref={loadMoreRef} className="load-more" type="button" onClick={() => setVisibleWindow({ key: filterKey, count: visibleCount + RESULT_BATCH_SIZE })}>{text(lang, `加载更多（还有 ${filtered.length - visiblePlugins.length} 个）`, `Load more (${filtered.length - visiblePlugins.length} remaining)`)}</button>}
-              </div>
             </div>
           </section>
         )}
@@ -1433,6 +1424,7 @@ export function PluginHub({
         <span>{text(lang, "社区索引 · 与 DeepSeek AI 无隶属关系", "Community index · not affiliated with DeepSeek AI")}</span>
         <Link href="/api/plugins">JSON API</Link>
       </footer>
+      </div>
       {copyMessage && <div className="toast" role="status" aria-live="polite">{copyMessage}</div>}
     </div>
   );

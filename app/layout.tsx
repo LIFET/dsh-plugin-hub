@@ -33,8 +33,8 @@ const sharedMetadata: Metadata = {
 export const viewport: Viewport = {
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f4f5f3" },
-    { media: "(prefers-color-scheme: dark)", color: "#101412" },
+    { media: "(prefers-color-scheme: light)", color: "#f2f2f7" },
+    { media: "(prefers-color-scheme: dark)", color: "#000000" },
   ],
 };
 
@@ -79,7 +79,7 @@ export default async function RootLayout({
     <html lang={initialLanguage} data-theme={initialTheme} className={`${sourceSans.variable} ${notoSans.variable}`} suppressHydrationWarning>
       <head><script dangerouslySetInnerHTML={{ __html: preferenceBootstrap }} /></head>
       <body>
-        <div hidden dangerouslySetInnerHTML={{ __html: `<!-- THESIS: A working catalog. Search, then names, then evidence, then a pinned command. Not a color costume. OWN-WORLD: Cool paper, white list panel, one teal for action and current, one sans. STORY: Find a plugin, read the check, copy the command. FIRST VIEWPORT: Light header. One-line job. Search. The list starts in the same view. Catalog: filters left, results right. FORM: Product tool, not a theme. No footer author. FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance -->` }} />
+        <div hidden dangerouslySetInnerHTML={{ __html: `<!-- THESIS: A split-view catalog. Sidebar for place, content for search and names. OWN-WORLD: Grouped canvas, white content, one tint, system-like rows. STORY: Find, check, copy. FIRST VIEWPORT: Sidebar routes; content has the job line, search, then an inset list. FORM: Premium Neutral applied to a web tool. No footer author. FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance -->` }} />
         {children}
       </body>
     </html>
