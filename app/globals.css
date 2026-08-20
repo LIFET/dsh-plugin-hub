@@ -699,7 +699,7 @@ html[data-theme="dark"] .primary-button,
 
 .page-section { min-height: calc(100vh - 220px); min-width: 0; }
 .catalog,
-.catalog-main,
+.catalog-main { min-width: 0; }
 .plugin-page { min-width: 0; padding-inline: var(--gutter); }
 
 .page-heading h1 {
