@@ -1392,7 +1392,7 @@ export function PluginHub({
                     <Link href={pluginPath(plugin)} prefetch={false} onClick={(event) => openInDrawer(event, () => openPlugin(plugin))}>
                       <b>{String(index + 1).padStart(2, "0")}</b>
                       <span><strong>{visiblePluginName(plugin)}</strong><small>{plugin.repo} · {data.categories[plugin.category][lang]}</small></span>
-                      <em>★ {formatNumber(plugin.stars, lang)}</em>
+                      <em>{formatNumber(plugin.stars, lang)}</em>
                       <span className={`signal signal--${plugin.attention.level}`}>{signalLabel(plugin, lang)}</span>
                     </Link>
                     <button className="copy-install" type="button" onClick={() => copy(pluginInstallCommand(plugin), `${plugin.id}-rank`)} aria-label={text(lang, "复制安装命令", "Copy install command")}>{copied === `${plugin.id}-rank` ? text(lang, "已复制", "Copied") : <IconCopy />}</button>
